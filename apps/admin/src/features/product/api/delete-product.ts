@@ -2,9 +2,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { productKeys } from '@/features/product/api/query-keys';
 import { api } from '@/lib/api/api';
+import { API_ENDPOINTS } from '@/lib/api/endpoints';
 
 export function deleteProduct(productId: string): Promise<void> {
-  return api.delete<void>(`/products/${productId}`);
+  return api.delete<void>(API_ENDPOINTS.product(productId));
 }
 
 // Mutation + cache cleanup: refresh the lists and drop the deleted product's

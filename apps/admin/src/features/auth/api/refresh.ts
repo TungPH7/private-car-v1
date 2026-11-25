@@ -2,6 +2,7 @@ import axios from 'axios';
 
 import { authTokensSchema } from '@/features/auth/model/auth';
 import { env } from '@/config/env';
+import { API_ENDPOINTS, GRANT_TYPE } from '@/lib/api/endpoints';
 import { getRefreshToken, setTokens } from '@/lib/auth/token-storage';
 
 // Token refresh uses a BARE axios call (not the shared `api` client) on purpose:
@@ -14,8 +15,8 @@ export async function refreshAuthTokens(): Promise<void> {
     throw new Error('No refresh token available');
   }
   const response = await axios.post<unknown>(
-    `${env.apiUrl}/auth/refresh-token`,
-    { refreshToken },
+    `${env.apiUrl}${API_ENDPOINTS.tokens}`,
+    { grantType: GRANT_TYPE.refreshToken, refreshToken },
     { headers: { 'Content-Type': 'application/json' } },
   );
   setTokens(authTokensSchema.parse(response.data));

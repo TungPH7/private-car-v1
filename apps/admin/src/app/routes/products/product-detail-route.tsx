@@ -4,6 +4,7 @@ import { paths } from '@/config/paths';
 import { Can } from '@/features/auth/components/can';
 import { ProductDeleteButton } from '@/features/product/components/product-delete-button';
 import { ProductDetail } from '@/features/product/components/product-detail';
+import { API_PERMISSION } from '@/lib/auth/api-permissions';
 import { invariant } from '@/utils/assert';
 
 // App-level composition: ProductDetail (product feature) stays unaware of the auth
@@ -18,10 +19,16 @@ export function ProductDetailRoute() {
     <ProductDetail
       actions={
         <>
-          <Can method="PUT" path="/products">
+          <Can
+            method={API_PERMISSION.productUpdate.method}
+            path={API_PERMISSION.productUpdate.path}
+          >
             <Link to={paths.productEdit.getHref(productId)}>Edit</Link>
           </Can>{' '}
-          <Can method="DELETE" path="/products">
+          <Can
+            method={API_PERMISSION.productDelete.method}
+            path={API_PERMISSION.productDelete.path}
+          >
             <ProductDeleteButton productId={productId} />
           </Can>
         </>

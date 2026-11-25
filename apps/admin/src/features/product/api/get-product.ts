@@ -3,9 +3,10 @@ import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
 import { productKeys } from '@/features/product/api/query-keys';
 import { type Product, productSchema } from '@/features/product/model/product';
 import { api } from '@/lib/api/api';
+import { API_ENDPOINTS } from '@/lib/api/endpoints';
 
 export function getProduct(productId: string): Promise<Product> {
-  return api.get(`/products/${productId}`, { schema: productSchema });
+  return api.get(API_ENDPOINTS.product(productId), { schema: productSchema });
 }
 
 export function productQueryOptions(productId: string) {

@@ -7,6 +7,7 @@ import { RouteError } from '@/app/routes/route-error';
 import { paths } from '@/config/paths';
 import { ProtectedRoute } from '@/features/auth/components/protected-route';
 import { RequireModule } from '@/features/auth/components/require-module';
+import { PERMISSION_MODULE } from '@/lib/auth/api-permissions';
 
 // Pure-data route table (React Router v7 data router).
 //
@@ -73,7 +74,7 @@ export const routes: RouteObject[] = [
           },
           // Module-gated (RBAC): the guard carries the required module.
           {
-            element: <RequireModule module="role" />,
+            element: <RequireModule module={PERMISSION_MODULE.product} />,
             children: [
               {
                 path: paths.admin.path,

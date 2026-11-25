@@ -1,15 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
-import { TextField } from '@/components/form/text-field';
 import { useCreateProduct } from '@/features/product/api/create-product';
-import { createProductSchema, type NewProduct } from '@/features/product/model/product';
+import { ProductFields } from '@/features/product/components/product-fields';
+import { type ProductInput, productInputSchema } from '@/features/product/model/product';
 import { isApiError } from '@/lib/api/api-error';
 
 // Second form sharing the exact same pattern as LoginForm — proves it generalizes.
-// Reuses `createProductSchema` (folder 08) as the resolver and `useCreateProduct`
-// (folder 08, which invalidates the product list on success). `valueAsNumber`
-// converts the price input to a number so the schema's int/nonnegative check applies.
+// Reuses `productInputSchema` (the rules of the API) as the resolver and `useCreateProduct`
+// (folder 08, which invalidates the product list on success). The fields are
+// `ProductFields`, shared with the edit form.
 export function ProductCreateForm() {
   const createProduct = useCreateProduct();
   const {
@@ -17,9 +17,9 @@ export function ProductCreateForm() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<NewProduct>({
-    resolver: zodResolver(createProductSchema),
-    defaultValues: { name: '', priceCents: 0, inStock: true },
+  } = useForm<ProductInput>({
+    resolver: zodResolver(productInputSchema),
+    defaultValues: { name: '', slug: '', price: 0, description: '' },
   });
 
   const submit = handleSubmit((values) => {
@@ -28,17 +28,7 @@ export function ProductCreateForm() {
 
   return (
     <form onSubmit={(event) => void submit(event)} noValidate>
-      <TextField label="Name" error={errors.name?.message} {...register('name')} />
-      <TextField
-        label="Price (cents)"
-        type="number"
-        min={0}
-        error={errors.priceCents?.message}
-        {...register('priceCents', { valueAsNumber: true })}
-      />
-      <label>
-        <input type="checkbox" {...register('inStock')} /> In stock
-      </label>{' '}
+      <ProductFields register={register} errors={errors} />
       <button type="submit" disabled={createProduct.isPending}>
         {createProduct.isPending ? 'Creating…' : 'Create product'}
       </button>

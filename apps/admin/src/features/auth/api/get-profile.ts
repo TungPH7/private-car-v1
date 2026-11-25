@@ -4,15 +4,16 @@ import { authKeys } from '@/features/auth/api/auth-keys';
 import { useAccessToken } from '@/features/auth/hooks/use-access-token';
 import { userSchema, type User } from '@/features/auth/model/auth';
 import { api } from '@/lib/api/api';
+import { API_ENDPOINTS } from '@/lib/api/endpoints';
 
-// GET /profile → the authenticated user + role.permissions. Login returns ONLY
+// GET /users/me → the authenticated user + role.permissions. Login returns ONLY
 // tokens, so the user is fetched separately — this query is the source of truth
 // for `isAuthenticated` (a present-but-invalid token fails here).
 //
 // NOTE: if the backend wraps responses in an envelope (e.g. `{ data: ... }`),
 // adjust the schema here. Confirmed against the live backend at folder 15.
 export function getProfile(): Promise<User> {
-  return api.get('/profile', { schema: userSchema });
+  return api.get(API_ENDPOINTS.me, { schema: userSchema });
 }
 
 export function profileQueryOptions() {
