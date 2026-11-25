@@ -47,8 +47,15 @@ apps:
       env: PORT
       default: 5173
     health: /
+    # The admin panel: on a host of its own behind the basic auth of the VPS, never indexed.
+    public: true
+    seo: false
     env:
       API_URL: http://localhost:3001
+    hosts:
+      development: private-car-v1-admin-dev.ao.t2g.io.vn
+      staging: private-car-v1-admin-staging.ao.t2g.io.vn
+      production: private-car-v1-admin.ao.t2g.io.vn
   api:
     repo: private-car-v1
     path: apps/api
@@ -58,8 +65,15 @@ apps:
       env: PORT
       default: 3001
     health: /actuator/health
+    # On a host of its own for Swagger UI (/swagger-ui.html), behind the basic auth of the VPS, never indexed.
+    public: true
+    seo: false
     env:
       APP_SECURITY_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000
+    hosts:
+      development: private-car-v1-api-dev.ao.t2g.io.vn
+      staging: private-car-v1-api-staging.ao.t2g.io.vn
+      production: private-car-v1-api.ao.t2g.io.vn
     # The <excludes> of jacoco-maven-plugin in apps/api/pom.xml, as source paths; MapperImpl is generated in target/.
     coverage_exclude:
       - src/main/java/com/tungph7/learnpostgres/LearnPostgresqlApiApplication.java
@@ -78,6 +92,22 @@ review:
 runs:
   worktrees: true
   lanes_max: 3
+  # Free RAM another agent needs to start, as for shop on this machine (16 GB).
+  min_free_ram_gb: 1.5
+  # Files git does not track that a lane needs: the database and secrets of the api, and AUTH_SECRET of web.
+  copy:
+    - apps/api/.env
+    - apps/web/.env.development
+  # Each lane has its own Postgres of apps/api/docker-compose.yml: these come before apps/api/.env. The ports move by
+  # (slot + 1) x 100 (5552, 5652, 5752) and the names end in -s1, -s2, -s3, so no lane meets another or yours.
+  lane_env:
+    ports:
+      POSTGRES_HOST_PORT: 5452
+      DB_PORT: 5452
+    names:
+      COMPOSE_PROJECT_NAME: private-car-v1
+      POSTGRES_CONTAINER_NAME: private-car-v1-postgres
+      COMPOSE_NETWORK_NAME: private-car-v1-api-network
   budget_usd: 50
   idle_hours: 8
   agents_per_role:
