@@ -43,8 +43,8 @@ test('mapToProductList turns the 0-based page of the API into the 1-based page o
 });
 
 test('formatPrice formats the USD price of the API in the locale of the page', () => {
-  // Intl puts a no-break space between the amount and the sign in some locales.
-  const plain = (s: string) => s.replace(/ /g, ' ');
+  // Intl puts a no-break space between the amount and the sign in some locales: \s matches it.
+  const plain = (s: string) => s.replace(/\s/g, ' ');
   expect(plain(formatPrice(29.99, 'en'))).toBe('$29.99');
   expect(plain(formatPrice(1200, 'en'))).toBe('$1,200.00');
   expect(plain(formatPrice(29.99, 'vi'))).toBe('29,99 US$');
