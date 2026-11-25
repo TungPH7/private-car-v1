@@ -146,7 +146,16 @@ public enum ErrorCode {
   // khóa
   // của bảng, quá lâu. Không phải bug (500) hay request sai (4xx): câu được phép, chỉ là quá lâu
   // với dữ liệu / plan / khóa hiện tại.
-  ADM_QUERY_TIMEOUT(HttpStatus.SERVICE_UNAVAILABLE, "Query exceeded the time limit");
+  ADM_QUERY_TIMEOUT(HttpStatus.SERVICE_UNAVAILABLE, "Query exceeded the time limit"),
+
+  // ==== F09 Auth (PCAR-4) ===========================================
+  // Email không có và mật khẩu sai trả CÙNG một mã: phân biệt hai trường hợp là cho người dò
+  // biết email nào có tài khoản.
+  AUTH_INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid email or password"),
+  // Refresh token không có, hết hạn, đã thu hồi, hoặc của tài khoản đã khóa: client đăng nhập lại.
+  AUTH_INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token"),
+  // Đổi mật khẩu: mật khẩu hiện tại gõ sai. 400, không phải 401: người gọi đã đăng nhập.
+  AUTH_WRONG_PASSWORD(HttpStatus.BAD_REQUEST, "Current password is incorrect");
 
   private final HttpStatus defaultStatus;
   private final String defaultTitle;

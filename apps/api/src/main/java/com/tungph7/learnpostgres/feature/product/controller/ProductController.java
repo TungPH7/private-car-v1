@@ -1,12 +1,15 @@
 package com.tungph7.learnpostgres.feature.product.controller;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,14 +20,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import com.tungph7.learnpostgres.common.dto.PagedResponse;
 import com.tungph7.learnpostgres.feature.product.domain.Product;
 import com.tungph7.learnpostgres.feature.product.dto.CreateProductRequest;
 import com.tungph7.learnpostgres.feature.product.dto.ProductResponse;
 import com.tungph7.learnpostgres.feature.product.dto.UpdatePriceRequest;
+import com.tungph7.learnpostgres.feature.product.dto.UpdateProductRequest;
 import com.tungph7.learnpostgres.feature.product.mapper.ProductMapper;
 import com.tungph7.learnpostgres.feature.product.service.ProductService;
 
@@ -50,6 +56,7 @@ public class ProductController {
 
   /** Trả 201 Created + Location header. (Pattern REST chuẩn cho POST tạo.) */
   @PostMapping
+  @ProductWrite
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(
       summary = "Create a product",
@@ -94,12 +101,56 @@ public class ProductController {
   }
 
   @GetMapping
-  @Operation(summary = "List all products")
-  public List<ProductResponse> list() {
-    return service.list().stream().map(mapper::toResponse).toList();
+  @Operation(
+      summary = "List products, a page at a time",
+      description =
+          "page starts at 0; size at most 100; sort by name, price or createdAt (default"
+              + " createdAt,desc); name keeps the products whose name contains it, ignoring case.")
+  @ApiResponse(responseCode = "200", description = "OK")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Sort on a property that is not listed",
+      content =
+          @Content(
+              mediaType = "application/problem+json",
+              schema = @Schema(ref = "#/components/schemas/ProblemDetail")))
+  public PagedResponse<ProductResponse> list(
+      @Parameter(description = "Part of the name, ignoring case", example = "postgres")
+          @RequestParam(required = false)
+          String name,
+      @ParameterObject
+          @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return PagedResponse.from(service.search(name, pageable).map(mapper::toResponse));
+  }
+
+  @PutMapping("/{id}")
+  @ProductWrite
+  @Operation(
+      summary = "Replace the name, slug, price and description of a product",
+      description = "Slug must stay unique (case-insensitive).")
+  @ApiResponse(responseCode = "200", description = "OK")
+  @ApiResponse(
+      responseCode = "404",
+      description = "Product not found",
+      content =
+          @Content(
+              mediaType = "application/problem+json",
+              schema = @Schema(ref = "#/components/schemas/ProblemDetail")))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Slug already used by another product",
+      content =
+          @Content(
+              mediaType = "application/problem+json",
+              schema = @Schema(ref = "#/components/schemas/ProblemDetail")))
+  public ProductResponse update(
+      @PathVariable UUID id, @Valid @RequestBody UpdateProductRequest req) {
+    return mapper.toResponse(service.update(id, req));
   }
 
   @PutMapping("/{id}/price")
+  @ProductWrite
   @Operation(summary = "Update product price")
   @ApiResponse(responseCode = "200", description = "OK")
   @ApiResponse(
@@ -123,12 +174,14 @@ public class ProductController {
   }
 
   @PutMapping("/bulk-price/{slug}")
+  @ProductWrite
   public int bulkUpdatePrice(
       @PathVariable String slug, @Valid @RequestBody UpdatePriceRequest req) {
     return service.bulkUpdatePriceBySlug(slug, req.price());
   }
 
   @DeleteMapping("/{id}")
+  @ProductWrite
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Delete a product")
   @ApiResponse(responseCode = "204", description = "Deleted")

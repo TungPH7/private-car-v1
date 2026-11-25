@@ -65,6 +65,10 @@ spring:
     scheduling:
       pool:
         size: 2
+  data:
+    web:
+      pageable:
+        max-page-size: 100
 server:
   port: "${PORT:3001}"
   servlet:
@@ -86,6 +90,15 @@ info:
     java:
       version: 21
 app:
+  auth:
+    issuer: "${APP_AUTH_ISSUER:learn-postgresql-api}"
+    access-token-ttl: "${APP_AUTH_ACCESS_TOKEN_TTL:PT15M}"
+    refresh-token-ttl: "${APP_AUTH_REFRESH_TOKEN_TTL:P7D}"
+    jwt:
+      secret: "${APP_AUTH_JWT_SECRET:}"
+    bootstrap-admin:
+      email: "${APP_AUTH_BOOTSTRAP_ADMIN_EMAIL:}"
+      password: "${APP_AUTH_BOOTSTRAP_ADMIN_PASSWORD:}"
   business:
     timezone: "${APP_BUSINESS_TIMEZONE:Asia/Ho_Chi_Minh}"
   dashboard:
@@ -108,7 +121,7 @@ app:
     cors:
       allowed-origins: "${APP_SECURITY_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}"
       allowed-methods: "${APP_SECURITY_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}"
-      allowed-headers: "${APP_SECURITY_CORS_ALLOWED_HEADERS:Content-Type,Authorization,X-Correlation-Id,Idempotency-Key}"
+      allowed-headers: "${APP_SECURITY_CORS_ALLOWED_HEADERS:Content-Type,Authorization,X-Access-Token,X-Correlation-Id,Idempotency-Key}"
       exposed-headers: "${APP_SECURITY_CORS_EXPOSED_HEADERS:X-Correlation-Id,Location}"
       allow-credentials: "${APP_SECURITY_CORS_ALLOW_CREDENTIALS:false}"
       max-age-seconds: "${APP_SECURITY_CORS_MAX_AGE_SECONDS:3600}"

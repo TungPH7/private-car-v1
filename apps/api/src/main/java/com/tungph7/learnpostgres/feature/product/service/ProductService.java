@@ -1,17 +1,21 @@
 package com.tungph7.learnpostgres.feature.product.service;
 
 import java.math.BigDecimal;
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.tungph7.learnpostgres.common.error.BadRequestException;
 import com.tungph7.learnpostgres.common.error.ConflictException;
 import com.tungph7.learnpostgres.common.error.ErrorCode;
 import com.tungph7.learnpostgres.common.error.NotFoundException;
 import com.tungph7.learnpostgres.feature.product.domain.Product;
 import com.tungph7.learnpostgres.feature.product.dto.CreateProductRequest;
+import com.tungph7.learnpostgres.feature.product.dto.UpdateProductRequest;
 import com.tungph7.learnpostgres.feature.product.mapper.ProductMapper;
 import com.tungph7.learnpostgres.feature.product.repository.ProductRepository;
 
@@ -28,6 +32,9 @@ import com.tungph7.learnpostgres.feature.product.repository.ProductRepository;
 @Service
 @Transactional(readOnly = true)
 public class ProductService {
+
+  /** Thuộc tính client được sắp theo — khớp tham số sort của GET /api/products. */
+  static final Set<String> SORTABLE = Set.of("name", "price", "createdAt");
 
   private final ProductRepository repository;
   private final ProductMapper mapper;
@@ -56,8 +63,46 @@ public class ProductService {
                     "Product with slug '%s' not found.".formatted(slug)));
   }
 
-  public List<Product> list() {
-    return repository.findAll();
+  /**
+   * Một trang sản phẩm; {@code name} khác rỗng thì chỉ giữ sản phẩm có tên chứa nó, không phân biệt
+   * hoa thường. Chỉ sắp theo {@link #SORTABLE}: một thuộc tính khác (vd {@code version}) là 400,
+   * không phải 500 của Spring Data.
+   */
+  public Page<Product> search(String name, Pageable pageable) {
+    pageable
+        .getSort()
+        .forEach(
+            order -> {
+              if (!SORTABLE.contains(order.getProperty())) {
+                throw new BadRequestException(
+                    ErrorCode.INVALID_PARAMETER,
+                    "Cannot sort products by '%s': use one of %s."
+                        .formatted(order.getProperty(), SORTABLE));
+              }
+            });
+    if (name == null || name.isBlank()) {
+      return repository.findAll(pageable);
+    }
+    return repository.findByNameContainingIgnoreCase(name.trim(), pageable);
+  }
+
+  @Transactional
+  public Product update(UUID id, UpdateProductRequest req) {
+    Product product = getById(id);
+    repository
+        .findBySlug(req.slug())
+        .filter(other -> !other.equals(product))
+        .ifPresent(
+            other -> {
+              throw new ConflictException(
+                  ErrorCode.PRODUCT_SLUG_DUPLICATED,
+                  "Product slug '%s' already exists.".formatted(req.slug()));
+            });
+    product.setName(req.name());
+    product.setSlug(req.slug());
+    product.setPrice(req.price());
+    product.setDescription(req.description());
+    return repository.save(product);
   }
 
   @Transactional
