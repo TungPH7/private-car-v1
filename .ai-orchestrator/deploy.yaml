@@ -12,11 +12,13 @@ apps:
     dockerfile: apps/admin/Dockerfile
     port: 5173
     health: /
+    public: true
   api:
     dockerfile: apps/api/Dockerfile
     context: apps/api
     port: 3001
     health: /actuator/health
+    public: true
     memory: 768m
     start_timeout: 180
     # From /etc/ao/secrets/private-car-v1/<environment>.env: the profile of the environment, and the app user of its

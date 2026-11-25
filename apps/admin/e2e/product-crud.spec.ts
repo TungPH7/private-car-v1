@@ -33,12 +33,13 @@ const ADMIN_PROFILE = {
 async function setupMockedApp(page: Page, initial: MockProduct[]): Promise<void> {
   const products = [...initial];
 
-  // Mock ONLY the backend (VITE_API_URL), anchored to its origin so these routes
-  // do NOT intercept SPA navigations to localhost — page.goto('/products') is a
-  // document request to the dev server, not an API call. (Mirrors VITE_API_URL.)
-  const profileUrl = 'https://ecom-nest.t2g.io.vn/profile';
-  const productsRe = /^https:\/\/ecom-nest\.t2g\.io\.vn\/products(\?.*)?$/;
-  const productItemRe = /^https:\/\/ecom-nest\.t2g\.io\.vn\/products\/[^/?]+$/;
+  // Mock ONLY the backend: the app calls the API on /api of its own origin
+  // (VITE_API_URL, default /api), on whatever port the run gives it. Anchored to
+  // /api so these routes do NOT intercept SPA navigations — page.goto('/products')
+  // is a document request to the dev server, not an API call.
+  const profileRe = /^https?:\/\/[^/]+\/api\/profile(\?.*)?$/;
+  const productsRe = /^https?:\/\/[^/]+\/api\/products(\?.*)?$/;
+  const productItemRe = /^https?:\/\/[^/]+\/api\/products\/[^/?]+$/;
 
   // Seed the auth tokens BEFORE the app loads (string content → no DOM types
   // needed in this Node-typed spec). Keys match src/lib/auth/token-storage.ts.
@@ -47,7 +48,7 @@ async function setupMockedApp(page: Page, initial: MockProduct[]): Promise<void>
       "localStorage.setItem('tungph7.auth.access','e2e-access');localStorage.setItem('tungph7.auth.refresh','e2e-refresh');",
   });
 
-  await page.route(profileUrl, (route) => route.fulfill({ json: ADMIN_PROFILE }));
+  await page.route(profileRe, (route) => route.fulfill({ json: ADMIN_PROFILE }));
 
   // Collection: GET list + POST create.
   await page.route(productsRe, async (route) => {
