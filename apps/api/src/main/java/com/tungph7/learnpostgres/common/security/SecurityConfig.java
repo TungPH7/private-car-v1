@@ -2,10 +2,14 @@ package com.tungph7.learnpostgres.common.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -16,9 +20,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 public class SecurityConfig {
 
+  /** Tên quyền của V20, cũng là authority trong claim scope của access token. */
+  static final String PRODUCT_CREATE = "product:create";
+
+  static final String PRODUCT_UPDATE = "product:update";
+  static final String PRODUCT_DELETE = "product:delete";
+
   @Bean
   public SecurityFilterChain securityFilterChain(
-      HttpSecurity http, SecurityProperties props, SecurityProblemHandler problemHandler)
+      HttpSecurity http,
+      SecurityProperties props,
+      SecurityProblemHandler problemHandler,
+      JwtDecoder jwtDecoder,
+      JwtAuthenticationConverter jwtAuthenticationConverter,
+      BearerTokenResolver bearerTokenResolver)
       throws Exception {
     SecurityProperties.Headers h = props.headers();
     return http.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -27,6 +42,18 @@ public class SecurityConfig {
         .formLogin(AbstractHttpConfigurer::disable)
         .httpBasic(AbstractHttpConfigurer::disable)
         .logout(AbstractHttpConfigurer::disable)
+        // Access token JWT (docs/adr/0001-api-authentication.md): Authorization: Bearer, hoặc
+        // X-Access-Token sau basic auth của môi trường (AccessTokenResolver). Token sai hay hết
+        // hạn là 401 problem+json, kể cả trên endpoint mở.
+        .oauth2ResourceServer(
+            rs ->
+                rs.bearerTokenResolver(bearerTokenResolver)
+                    .jwt(
+                        jwt ->
+                            jwt.decoder(jwtDecoder)
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter))
+                    .authenticationEntryPoint(problemHandler)
+                    .accessDeniedHandler(problemHandler))
         .authorizeHttpRequests(
             auth ->
                 auth
@@ -46,11 +73,27 @@ public class SecurityConfig {
                     .requestMatchers("/error")
                     .permitAll()
 
-                    // === Future: auth endpoint khi có JWT ===
-                    // .requestMatchers("/api/auth/**").permitAll()
+                    // === Đăng nhập, làm mới, đăng xuất ===
+                    .requestMatchers(HttpMethod.POST, "/api/auth/tokens", "/api/auth/revocations")
+                    .permitAll()
 
-                    // === Business API ===
-                    // PHASE-2: đổi thành .authenticated() khi có JWT
+                    // === Tài khoản đang đăng nhập ===
+                    .requestMatchers("/api/users/me", "/api/users/me/**")
+                    .authenticated()
+
+                    // === Sản phẩm: đọc mở cho mọi người, ghi theo quyền ===
+                    .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/products")
+                    .hasAuthority(PRODUCT_CREATE)
+                    .requestMatchers(HttpMethod.PUT, "/api/products/**")
+                    .hasAuthority(PRODUCT_UPDATE)
+                    .requestMatchers(HttpMethod.DELETE, "/api/products/**")
+                    .hasAuthority(PRODUCT_DELETE)
+
+                    // === Phần còn lại của API (/api/v1/**) ===
+                    // Còn mở như trước PCAR-4; đóng bằng quyền ở một Task sau, trước khi
+                    // Production bỏ basic auth (production_auth của deployer).
                     .requestMatchers("/api/**")
                     .permitAll()
 

@@ -29,6 +29,9 @@ public class OpenApiConfig {
         // No servers: springdoc gives the origin of each request, so "Try it out" of Swagger UI
         // calls the API it was read from, on this machine, on the port of a lane, or on the host
         // of an environment behind Caddy (server.forward-headers-strategy: native).
+        // Hai cách gửi cùng một access token (POST /api/auth/tokens), mỗi endpoint cần đăng nhập
+        // nhận cái nào cũng được. Trên Development và Staging, Authorization đang chở basic auth
+        // của môi trường: dùng accessToken (docs/adr/0001-api-authentication.md).
         .components(
             new Components()
                 .addSecuritySchemes(
@@ -37,7 +40,16 @@ public class OpenApiConfig {
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
                         .bearerFormat("JWT")
-                        .description("JWT Bearer token (folder 10 sẽ enable thật)")));
-    // Chưa addSecurityItem global — folder 10 sẽ làm khi thực sự bảo vệ endpoint.
+                        .description("Access token in Authorization: Bearer <token>."))
+                .addSecuritySchemes(
+                    "accessToken",
+                    new SecurityScheme()
+                        .type(SecurityScheme.Type.APIKEY)
+                        .in(SecurityScheme.In.HEADER)
+                        .name("X-Access-Token")
+                        .description(
+                            "The same access token, without Bearer, for a client whose"
+                                + " Authorization header carries the basic auth of the"
+                                + " environment.")));
   }
 }

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +17,12 @@ import com.tungph7.learnpostgres.feature.product.domain.Product;
 public interface ProductRepository extends JpaRepository<Product, UUID> {
 
   Optional<Product> findBySlug(String slug);
+
+  /**
+   * Sản phẩm có tên chứa {@code name}, không phân biệt hoa thường. Spring Data thoát {@code %} và
+   * {@code _} của tham số, nên người gọi không chèn được ký tự đại diện của LIKE.
+   */
+  Page<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
   /**
    * Bulk update price qua JPQL @Modifying — KHÔNG fire JPA Auditing listener (đây chính là blind

@@ -134,6 +134,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- JWT access token (PCAR-4, docs/adr/0001-api-authentication.md): the resource server checks the Bearer
+             token, jose signs and reads it with Nimbus. No version: the Spring Boot BOM sets Spring Security's.
+             Approved at 7.0.9 in .ai-orchestrator/project.yaml; run dep-check again when Spring Boot moves. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
 
         <!-- (Optional) test starter — folder 11 sẽ dùng đầy đủ -->
         <dependency>

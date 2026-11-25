@@ -116,3 +116,7 @@ runs:
     devops: 3
 claude:
   allow: []
+dependencies:
+  approved:
+    - { ecosystem: maven, name: org.springframework.security:spring-security-oauth2-resource-server, range: 7.0.9, by: security, on: 2026-11-26 }
+    - { ecosystem: maven, name: org.springframework.security:spring-security-oauth2-jose, range: 7.0.9, by: security, on: 2026-11-26 }

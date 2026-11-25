@@ -22,10 +22,14 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,6 +43,7 @@ import com.tungph7.learnpostgres.common.logging.LoggingProperties;
 import com.tungph7.learnpostgres.common.security.TestSecurityConfig;
 import com.tungph7.learnpostgres.feature.product.domain.Product;
 import com.tungph7.learnpostgres.feature.product.dto.CreateProductRequest;
+import com.tungph7.learnpostgres.feature.product.dto.UpdateProductRequest;
 import com.tungph7.learnpostgres.feature.product.mapper.ProductMapper;
 import com.tungph7.learnpostgres.feature.product.service.ProductService;
 
@@ -123,7 +128,7 @@ class ProductControllerWebMvcTest {
   }
 
   @Test
-  void GET_list_returns_array_of_products() throws Exception {
+  void GET_list_returns_a_page_of_products() throws Exception {
     Product p1 =
         productWithId(
             UUID.fromString("0193c1f4-7b9a-7a3c-8d2e-aa1c98dead01"),
@@ -136,14 +141,64 @@ class ProductControllerWebMvcTest {
             "B",
             "b",
             new BigDecimal("2.00"));
-    when(service.list()).thenReturn(List.of(p1, p2));
+    when(service.search(eq(null), any(Pageable.class)))
+        .thenAnswer(call -> new PageImpl<>(List.of(p1, p2), call.<Pageable>getArgument(1), 12));
 
     mockMvc
-        .perform(get("/api/products"))
+        .perform(get("/api/products").param("page", "1").param("size", "2"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.length()").value(2))
-        .andExpect(jsonPath("$[0].slug").value("a"))
-        .andExpect(jsonPath("$[1].slug").value("b"));
+        .andExpect(jsonPath("$.content.length()").value(2))
+        .andExpect(jsonPath("$.content[0].slug").value("a"))
+        .andExpect(jsonPath("$.content[1].slug").value("b"))
+        .andExpect(jsonPath("$.page.number").value(1))
+        .andExpect(jsonPath("$.page.size").value(2))
+        .andExpect(jsonPath("$.page.totalElements").value(12))
+        .andExpect(jsonPath("$.page.totalPages").value(6));
+  }
+
+  @Test
+  void GET_list_passes_the_name_and_sorts_newest_first_by_default() throws Exception {
+    when(service.search(eq("pg"), any(Pageable.class)))
+        .thenAnswer(call -> new PageImpl<>(List.<Product>of(), call.<Pageable>getArgument(1), 0));
+
+    mockMvc.perform(get("/api/products").param("name", "pg")).andExpect(status().isOk());
+
+    ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+    verify(service).search(eq("pg"), pageable.capture());
+    org.assertj.core.api.Assertions.assertThat(pageable.getValue().getPageNumber()).isZero();
+    org.assertj.core.api.Assertions.assertThat(pageable.getValue().getPageSize()).isEqualTo(20);
+    org.assertj.core.api.Assertions.assertThat(pageable.getValue().getSort())
+        .isEqualTo(Sort.by(Sort.Direction.DESC, "createdAt"));
+  }
+
+  @Test
+  void PUT_update_returns_200_with_the_updated_product() throws Exception {
+    UUID id = UUID.fromString("0193c1f4-7b9a-7a3c-8d2e-aa1c98dead05");
+    Product updated = productWithId(id, "New", "new", new BigDecimal("9.50"));
+    when(service.update(eq(id), any(UpdateProductRequest.class))).thenReturn(updated);
+
+    mockMvc
+        .perform(
+            put("/api/products/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New\",\"slug\":\"new\",\"price\":9.50}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("New"))
+        .andExpect(jsonPath("$.slug").value("new"));
+  }
+
+  @Test
+  void PUT_update_returns_400_problem_when_the_slug_is_not_lowercase() throws Exception {
+    UUID id = UUID.fromString("0193c1f4-7b9a-7a3c-8d2e-aa1c98dead05");
+
+    mockMvc
+        .perform(
+            put("/api/products/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New\",\"slug\":\"New Slug\",\"price\":9.50}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.code()))
+        .andExpect(jsonPath("$.errors[0].field").value("slug"));
   }
 
   @Test
