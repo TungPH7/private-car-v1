@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { changePasswordSchema, updateProfileSchema } from '~/features/auth/model/profile-form';
 import { getFieldErrorCodes } from '~/lib/validation/format-zod-error';
 
-test('hợp lệ: name + phone 9–15 + avatar URL', () => {
+test('valid: name + phone + https avatar', () => {
   const r = updateProfileSchema.safeParse({
     name: 'An',
     phoneNumber: '0123456789',
@@ -39,8 +39,8 @@ test('name quá dài → too_long', () => {
 test('đổi mật khẩu hợp lệ (new === confirm)', () => {
   const r = changePasswordSchema.safeParse({
     password: 'old123',
-    newPassword: 'new123',
-    confirmNewPassword: 'new123',
+    newPassword: 'new12345',
+    confirmNewPassword: 'new12345',
   });
   expect(r.success).toBe(true);
 });
@@ -48,19 +48,44 @@ test('đổi mật khẩu hợp lệ (new === confirm)', () => {
 test('⭐ confirm LỆCH → password_mismatch ở confirmNewPassword (superRefine cross-field)', () => {
   const r = changePasswordSchema.safeParse({
     password: 'old123',
-    newPassword: 'new123',
-    confirmNewPassword: 'nope456',
+    newPassword: 'new12345',
+    confirmNewPassword: 'nope45678',
   });
   expect(r.success).toBe(false);
   if (!r.success) expect(getFieldErrorCodes(r.error).confirmNewPassword).toBe('password_mismatch');
 });
 
-test('mật khẩu mới < 6 → password_too_short', () => {
+test('a new password under 8 characters → password_too_short', () => {
   const r = changePasswordSchema.safeParse({
     password: 'old123',
-    newPassword: 'abc',
-    confirmNewPassword: 'abc',
+    newPassword: 'abcdefg',
+    confirmNewPassword: 'abcdefg',
   });
   expect(r.success).toBe(false);
   if (!r.success) expect(getFieldErrorCodes(r.error).newPassword).toBe('password_too_short');
+});
+
+test('a phone with letters → invalid_phone (the rule of the API)', () => {
+  const r = updateProfileSchema.safeParse({ name: 'An', phoneNumber: 'call-me-now', avatar: '' });
+  expect(r.success).toBe(false);
+  if (!r.success) expect(getFieldErrorCodes(r.error).phoneNumber).toBe('invalid_phone');
+});
+
+test('an avatar that is not https → invalid_url (the API takes https only)', () => {
+  for (const avatar of ['http://x.com/a.png', 'javascript:alert(1)']) {
+    const r = updateProfileSchema.safeParse({ name: 'An', phoneNumber: '', avatar });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(getFieldErrorCodes(r.error).avatar).toBe('invalid_url');
+  }
+});
+
+test('a new password over 72 characters → too_long (BCrypt of the API)', () => {
+  const long = 'x'.repeat(73);
+  const r = changePasswordSchema.safeParse({
+    password: 'old-password',
+    newPassword: long,
+    confirmNewPassword: long,
+  });
+  expect(r.success).toBe(false);
+  if (!r.success) expect(getFieldErrorCodes(r.error).newPassword).toBe('too_long');
 });

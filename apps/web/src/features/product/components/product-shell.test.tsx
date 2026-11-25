@@ -30,8 +30,8 @@ import { renderWithProviders, screen, waitFor } from '~/testing/render';
 
 // Fixture DTO tối thiểu (khớp `product-list.test`): A đang sale (giá gốc > giá bán), B không sale.
 const products: Product[] = [
-  { id: 1, name: 'Sản phẩm A', priceVnd: 800000, originalPriceVnd: 1200000, images: [] },
-  { id: 2, name: 'Sản phẩm B', priceVnd: 50000, originalPriceVnd: 50000, images: [] },
+  { id: 'a1', name: 'Sản phẩm A', price: 800, originalPrice: 1200, images: [] },
+  { id: 'b2', name: 'Sản phẩm B', price: 50, originalPrice: 50, images: [] },
 ];
 
 // Density (Redux) persist qua localStorage → xoá giữa các test để mỗi test bắt đầu từ mặc định
@@ -72,6 +72,7 @@ function ProductShellHarness({ products: items }: { products: Product[] }) {
             <ProductList
               products={items}
               emptyLabel={t('empty')}
+              locale="en"
               renderItemActions={(product) => (
                 <button type="button">{`${t('zoom')}: ${product.name}`}</button>
               )}

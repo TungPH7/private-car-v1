@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
 /**
- * DTO TỐI THIỂU cho `GET /profile` (kỷ luật folder 11: validate ở biên, chỉ giữ field DÙNG). Backend
- * trả nhiều hơn (phoneNumber, avatar, status, role.id, permission.id/name/description…) — Zod object
- * non-strict BỎ field thừa → DTO gọn + chịu được drift. Đủ cho hiển thị + RBAC: id/email/name +
- * role.name + permissions{module,path,method}.
+ * Minimal DTO of `GET /api/users/me` of the Java API (PCAR-4): validate at the boundary and keep
+ * only the fields the app uses. Zod objects are non-strict, so extra fields (the permission
+ * `name`, …) are dropped and the DTO survives drift. Enough for display and RBAC: id, email,
+ * name, phone and avatar for the profile form, role name and permissions {module, path, method}.
  */
 const permissionSchema = z.object({
   module: z.string(),
@@ -13,12 +13,15 @@ const permissionSchema = z.object({
 });
 
 export const profileSchema = z.object({
-  id: z.number(),
+  /** The account UUID, the `sub` and `userId` of the access token. */
+  id: z.string().min(1),
   email: z.email(),
   name: z.string(),
-  // ⭐ folder 16: form sửa hồ sơ cần prefill `phoneNumber`/`avatar` → DTO mở rộng thêm 2 field
-  // (vẫn "tối thiểu" = chỉ field app DÙNG; backend trả nhiều hơn, Zod non-strict bỏ phần thừa).
-  phoneNumber: z.string(),
+  // The API sends null when there is no phone; the profile form edits a string.
+  phoneNumber: z
+    .string()
+    .nullable()
+    .transform((value) => value ?? ''),
   avatar: z.string().nullable(),
   role: z.object({
     name: z.string(),

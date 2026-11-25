@@ -36,10 +36,13 @@ const nextConfig: NextConfig = {
   // ⭐ Folder 20 — pino (LogSink server-only, folder 18→20): KHÔNG bundle pino, để Node `require` lúc
   // runtime → tránh Turbopack 16 vỡ bundling khi truy vết worker_threads của pino (vercel/next.js#86099).
   // Next 16.1+ đã TỰ thêm pino vào danh sách này; ta khai TƯỜNG MINH cho rõ ý + chống đổi danh sách ngầm.
-  // ⭐ Folder 24 — 'msw': E2E mock chạy trong server (instrumentation, chỉ khi E2E_API_MOCKING=1). Ngoại
-  // hoá để Turbopack KHÔNG bundle @mswjs/interceptors (patch http Node) → tránh lỗi bundling; chỉ được
-  // `require` khi cờ E2E bật. devDependency → prod thật (không set cờ) không bao giờ nạp.
-  serverExternalPackages: ['pino', 'msw'],
+  serverExternalPackages: ['pino'],
+
+  // The dev tools indicator of `next dev` sits bottom-left by default, on top of the first link of the
+  // home page nav (About): a click there lands on the indicator. The E2E of ai-orchestrator runs on
+  // `next dev` (root playwright.config.ts), so it moves to the empty bottom-right corner. Errors still
+  // show as before (docs: next-config-js/devIndicators).
+  devIndicators: { position: 'bottom-right' },
 
   // ⭐ Folder 20 — next/image: allowlist host ảnh REMOTE được tối ưu (bảo mật phía SERVER). Trình duyệt
   // CHỈ thấy `/_next/image?...` (same-origin) — optimizer FETCH host remote ở SERVER rồi proxy về → nên

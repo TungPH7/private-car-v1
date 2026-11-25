@@ -5,6 +5,9 @@ import { type ZodType } from 'zod';
 import { env } from '~/config/env/server';
 import { ApiError } from '~/lib/http/api-error';
 
+/** The HTTP methods the DAL sends. */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+
 /**
  * HTTP client của DAL — **native `fetch`** (server-first: hợp `use cache`, được Next bổ trợ;
  * KHÔNG axios như guide React SPA → 0 dependency).
@@ -20,12 +23,11 @@ import { ApiError } from '~/lib/http/api-error';
  * `init.headers` (vd `Authorization: Bearer …`) — KHÔNG gọi `cookies()` trong `use cache`
  * (luật cô lập folder 10). Mọi verb dưới đây đều forward `init.headers`.
  */
-async function request<T>(
-  method: string,
-  path: string,
-  schema: ZodType<T>,
-  init?: RequestInit,
-): Promise<T> {
+/**
+ * Sends one request and returns the response once it is 2xx; otherwise throws the normalized
+ * `ApiError` (network, or http with the status). Shared by the JSON verbs and `httpSendNoContent`.
+ */
+async function send(method: HttpMethod, path: string, init?: RequestInit): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(`${env.API_URL}${path}`, {
@@ -48,6 +50,16 @@ async function request<T>(
       message: `Request failed with status ${response.status}`,
     });
   }
+  return response;
+}
+
+async function request<T>(
+  method: HttpMethod,
+  path: string,
+  schema: ZodType<T>,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await send(method, path, init);
 
   let body: unknown;
   try {
@@ -92,4 +104,16 @@ export function httpPut<T>(path: string, schema: ZodType<T>, init?: RequestInit)
  */
 export function httpDelete<T>(path: string, schema: ZodType<T>, init?: RequestInit): Promise<T> {
   return request('DELETE', path, schema, init);
+}
+
+/**
+ * A request whose success has no body (204 No Content), such as sign-out, a password change or a
+ * delete of the Java API. Resolves once the status is 2xx; failures throw `ApiError` as above.
+ */
+export async function httpSendNoContent(
+  method: HttpMethod,
+  path: string,
+  init?: RequestInit,
+): Promise<void> {
+  await send(method, path, init);
 }

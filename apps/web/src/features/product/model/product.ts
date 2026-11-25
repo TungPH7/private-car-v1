@@ -1,48 +1,59 @@
 import { z } from 'zod';
 
 /**
- * Schema ở BIÊN: chỉ khai các field ta THỰC SỰ dùng → Zod tự loại mọi field nội bộ backend
- * (`createdById`/`updatedById`/`deletedById`/`variants`/`productTranslations`/timestamps…) =
- * bước "DTO tối thiểu" ngay tại boundary (data-security: chỉ giữ field UI cần).
+ * Schema at the BOUNDARY: only the fields we use, so Zod drops the rest (`slug`, `description`,
+ * `createdAt`…) — the "minimal DTO" step right at the boundary.
  *
- * ⭐ Folder 20: THÊM `images` vì UI giờ hiển thị ảnh (next/image) → DTO TIẾN HOÁ theo nhu cầu UI
- * (giống mở rộng `profileSchema` ở folder 16), KHÔNG phải nhồi sẵn. `.default([])` → fixture/cũ thiếu
- * field vẫn parse (an toàn ngược). variants/createdById/… VẪN bị loại — nguyên tắc "tối thiểu" còn nguyên.
- *
- * Nguồn sự thật = backend NestJS thật `ProductSchema` (xem
- * `10_dtd/Nestjs-Super/ecom/src/shared/models/shared-product.model.ts`): `id:number`,
- * `basePrice/virtualPrice:number` (VND, KHÔNG phải cents), `images:string[]` … (khác hẳn schema giả định guide React).
+ * Source of truth: `ProductResponse` of the Java API (`apps/api`, PCAR-4): `id` is a UUID, `price`
+ * a decimal in USD (`app.products.price`, numeric(12,2)).
  */
 const backendProductSchema = z.object({
-  id: z.number(),
+  id: z.string().min(1),
   name: z.string(),
-  basePrice: z.number(),
-  virtualPrice: z.number(),
-  images: z.array(z.string()).default([]),
+  price: z.number(),
 });
 
-/** Envelope phân trang: `GET /products` → `{ data, totalItems, page, limit, totalPages }`. */
+/**
+ * `PagedResponse` of `GET /api/products` (convention API-007 of the API):
+ * `{ content, page: { number (from 0), size, totalElements, totalPages } }`.
+ */
 export const productListResponseSchema = z.object({
-  data: z.array(backendProductSchema),
-  totalItems: z.number(),
-  page: z.number(),
-  limit: z.number(),
-  totalPages: z.number(),
+  content: z.array(backendProductSchema),
+  page: z.object({
+    number: z.number(),
+    size: z.number(),
+    totalElements: z.number(),
+    totalPages: z.number(),
+  }),
 });
 
 type BackendProduct = z.infer<typeof backendProductSchema>;
+type BackendProductList = z.infer<typeof productListResponseSchema>;
 
-/** DTO domain (tối thiểu — đúng cái UI cần). Tiền VND (đồng), KHÔNG phải cents. */
+/** Product endpoints of the Java API (`apps/api`, PCAR-4). */
+export const PRODUCT_ENDPOINTS = {
+  /** GET (public): a page of products. */
+  list: '/api/products',
+  /** DELETE (`product:delete`) → 204. */
+  item: (productId: string) => `/api/products/${encodeURIComponent(productId)}`,
+} as const;
+
+/** The currency of `price` in the API. */
+export const PRODUCT_CURRENCY = 'USD';
+
+/** Domain DTO: what the UI needs. */
 export interface Product {
-  id: number;
+  id: string;
   name: string;
-  priceVnd: number;
-  originalPriceVnd: number;
-  /** Folder 20 — danh sách URL ảnh (đã strip mọi field nội bộ khác). Có thể rỗng/placeholder. */
+  /** Selling price, in `PRODUCT_CURRENCY`. */
+  price: number;
+  /** Price before a discount; equal to `price` when the product is not on sale. */
+  originalPrice: number;
+  /** Image URLs; may be empty (then `productImageSrc` gives a placeholder). */
   images: string[];
 }
 
-/** Kết quả DAL danh sách (folder 13): DTO[] + meta phân trang lấy từ envelope backend. */
+/** Result of the list DAL (folder 13): DTOs + paging meta, `page` counted from 1 as in the UI. */
 export interface ProductListResult {
   items: Product[];
   page: number;
@@ -50,25 +61,39 @@ export interface ProductListResult {
   totalItems: number;
 }
 
-/** Map fat backend object → DTO tối thiểu. Hàm THUẦN → test trực tiếp. */
+/**
+ * Maps a product of the API to the UI shape. The API has no compare-at price and no images yet:
+ * `originalPrice` falls back to `price` (nothing shows as on sale) and `images` to none (a
+ * placeholder image), so the UI renders every field it needs. Pure → tested directly.
+ */
 export function mapToProduct(raw: BackendProduct): Product {
   return {
     id: raw.id,
     name: raw.name,
-    priceVnd: raw.basePrice,
-    originalPriceVnd: raw.virtualPrice,
-    images: raw.images,
+    price: raw.price,
+    originalPrice: raw.price,
+    images: [],
   };
 }
 
-// Host ảnh "giả" mà backend demo trả về (URL không load được). Khớp CHÍNH XÁC hostname (không phải hậu tố).
+/** Maps a page of the API (0-based) to the list result of the UI (1-based). */
+export function mapToProductList(raw: BackendProductList): ProductListResult {
+  return {
+    items: raw.content.map(mapToProduct),
+    page: raw.page.number + 1,
+    totalPages: raw.page.totalPages,
+    totalItems: raw.page.totalElements,
+  };
+}
+
+// Image hosts of fake URLs that do not load. Matched EXACTLY on the hostname (not a suffix).
 const PLACEHOLDER_IMAGE_HOSTS = new Set(['example.com', 'example.org', 'example.net']);
 
 /**
- * Nguồn ảnh cho card sản phẩm (folder 20). Backend demo trả URL ẢNH GIẢ (`https://example.com/imgN.jpg`,
- * không load được) → nếu ảnh đầu KHÔNG phải absolute-URL hợp lệ HOẶC trỏ host placeholder, rơi về ảnh
- * placeholder TẤT ĐỊNH theo `id` (picsum) để có ảnh thật minh hoạ next/image. Backend trả ảnh CDN THẬT thì
- * đi thẳng (nhớ thêm host đó vào `images.remotePatterns` ở next.config). Hàm THUẦN → test được.
+ * Image source of a product card (folder 20). A missing first image, one that is not an absolute
+ * URL, or one on a placeholder host → a DETERMINISTIC placeholder by `id` (picsum), so next/image
+ * has a real picture. A real CDN image goes through as it is (add its host to
+ * `images.remotePatterns` of next.config). Pure → tested.
  */
 export function productImageSrc(product: Pick<Product, 'id' | 'images'>): string {
   const first = product.images[0];
@@ -79,12 +104,12 @@ export function productImageSrc(product: Pick<Product, 'id' | 'images'>): string
 }
 
 /**
- * Format VND **deterministic** (tự nhóm hàng nghìn bằng regex, KHÔNG `Intl`/`toLocaleString` để
- * tránh phụ thuộc ICU giữa Node/browser → test khẳng định chuỗi chính xác): 800000 → "800.000 ₫".
+ * Formats a price in the locale of the page (i18n: grouping, decimal mark and currency sign come
+ * from the locale, never hard-coded). Product lists render on the server only, so the ICU of Node
+ * decides alone and no hydration can disagree.
  */
-export function formatPriceVnd(amount: number): string {
-  const grouped = Math.round(amount)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return `${grouped} ₫`;
+export function formatPrice(amount: number, locale: string): string {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: PRODUCT_CURRENCY }).format(
+    amount,
+  );
 }

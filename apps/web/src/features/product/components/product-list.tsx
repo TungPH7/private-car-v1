@@ -1,11 +1,13 @@
 import Image from 'next/image';
 import { type ReactNode } from 'react';
 
-import { formatPriceVnd, productImageSrc, type Product } from '~/features/product/model/product';
+import { formatPrice, productImageSrc, type Product } from '~/features/product/model/product';
 
 interface ProductListProps {
   products: Product[];
   emptyLabel: string;
+  /** Locale of the page: prices are formatted in it (i18n). */
+  locale: string;
   /**
    * Slot TUỲ CHỌN: render island tương tác (vd nút Xoá) cho từng dòng. Dùng render-prop để
    * ProductList giữ THUẦN (không tự import Server Action/'use client') → vẫn unit-test được như cũ;
@@ -16,9 +18,9 @@ interface ProductListProps {
 
 /**
  * View THUẦN sync (no hook, no I/O) → unit-test được (mẫu giống `SnapshotView` folder 10). Nhận
- * DTO[] đã map từ DAL. Hiển thị tên + giá; gạch giá gốc khi `originalPriceVnd > priceVnd` (đang sale).
+ * DTO[] đã map từ DAL. Hiển thị tên + giá theo locale; gạch giá gốc khi `originalPrice > price` (đang sale).
  */
-export function ProductList({ products, emptyLabel, renderItemActions }: ProductListProps) {
+export function ProductList({ products, emptyLabel, locale, renderItemActions }: ProductListProps) {
   if (products.length === 0) {
     return <p>{emptyLabel}</p>;
   }
@@ -39,11 +41,11 @@ export function ProductList({ products, emptyLabel, renderItemActions }: Product
               sizes="(max-width: 768px) 50vw, 240px"
             />
           </span>
-          <span>{product.name}</span> — <strong>{formatPriceVnd(product.priceVnd)}</strong>
-          {product.originalPriceVnd > product.priceVnd && (
+          <span>{product.name}</span> — <strong>{formatPrice(product.price, locale)}</strong>
+          {product.originalPrice > product.price && (
             <>
               {' '}
-              <del>{formatPriceVnd(product.originalPriceVnd)}</del>
+              <del>{formatPrice(product.originalPrice, locale)}</del>
             </>
           )}
           {renderItemActions ? <> {renderItemActions(product)}</> : null}

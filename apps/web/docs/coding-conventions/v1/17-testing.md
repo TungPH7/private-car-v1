@@ -72,9 +72,9 @@ Hai bẫy cô lập state phải nhớ:
 
 ## 17.8 E2E — `[MUST]`
 
-- **Chạy trên production build**: `pnpm build` → `next start` (port 3100, khác dev 3000). PPR/prerender/async-RSC chỉ đúng ở prod.
-- **Mock backend bằng MSW chạy TRONG server**, không dùng `page.route` — App Router fetch ở **server**, `page.route` của trình duyệt mù hoàn toàn với nó. Bật qua `instrumentation.ts` với gate 2 lớp: `NEXT_RUNTIME === 'nodejs'` **và** `E2E_API_MOCKING === '1'`.
-- Vì state mock dùng chung → chạy **serial**: `fullyParallel: false`, `workers: 1`, `reuseExistingServer: false`.
+- **Chạy bằng `playwright.config.ts` ở gốc repo** (của ai-orchestrator): nó bật mọi app theo `.ai-orchestrator/project.yaml`, kể cả `api` Java và Postgres, và dời cổng theo `AO_PORT_OFFSET` khi chạy trong làn. `/ao-qa` chạy cùng spec trên Development hoặc Staging.
+- **Không mock backend** (PCAR-5): E2E chạy trên **`api` Java thật**, vì trên môi trường không có mock nào nạp được. Test tự tạo dữ liệu qua API bằng `e2e/support/api.ts` (tài khoản quản trị: `E2E_ADMIN_*`, hoặc `APP_AUTH_BOOTSTRAP_ADMIN_*` của `apps/api/.env`), gắn **run id** vào tên và mở trang kèm bộ lọc theo run id đó, rồi xoá ở `afterAll`. Không có tài khoản quản trị → test cần nó `test.skip` kèm lý do.
+- Mỗi test chỉ thấy dữ liệu của chính nó → chạy **song song** được (`fullyParallel`).
 - Query theo **vai trò** như RTL.
 - a11y: `@axe-core/playwright` quét WCAG A/AA — **bổ trợ** cho `jsx-a11y` (tĩnh), không thay thế.
 - `pnpm e2e` **không** chạy ở pre-commit (chậm, cần browser + build) → chạy tay và ở CI.

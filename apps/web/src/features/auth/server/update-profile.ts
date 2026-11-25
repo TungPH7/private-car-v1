@@ -4,18 +4,28 @@ import {
   updateProfileResSchema,
   type UpdateProfileInput,
 } from '~/features/auth/model/profile-form';
+import { AUTH_ENDPOINTS } from '~/lib/auth/api-endpoints';
 import { authHeaders } from '~/lib/auth/auth-headers';
 import { httpPut } from '~/lib/http/client';
 
 /**
- * DAL cập nhật hồ sơ (BFF) — `PUT /profile` (`@ApiBearerAuth`): backend dùng userId trong token →
- * user chỉ sửa được hồ sơ CỦA MÌNH. `server-only`. `authHeaders()` đính Bearer (đọc cookie NGOÀI cache).
+ * Profile update DAL (BFF) — `PUT /api/users/me` (Bearer): the API takes the account from the
+ * token, so a user edits only their own profile. `server-only`. The form keeps empty strings; the
+ * API wants null for "no phone" and "no avatar".
  */
 export async function updateProfile(
   input: UpdateProfileInput,
-): Promise<{ id: number; name: string }> {
-  return httpPut('/profile', updateProfileResSchema, {
+): Promise<{ id: string; name: string }> {
+  return httpPut(AUTH_ENDPOINTS.me, updateProfileResSchema, {
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      name: input.name,
+      phoneNumber: emptyToNull(input.phoneNumber),
+      avatar: emptyToNull(input.avatar),
+    }),
   });
+}
+
+function emptyToNull(value: string): string | null {
+  return value.trim() === '' ? null : value;
 }

@@ -6,26 +6,28 @@ import { renderWithProviders, screen } from '~/testing/render';
 import { ProductList } from './product-list';
 
 const products: Product[] = [
-  { id: 1, name: 'Sản phẩm A', priceVnd: 800000, originalPriceVnd: 1200000, images: [] }, // đang sale
-  { id: 2, name: 'Sản phẩm B', priceVnd: 50000, originalPriceVnd: 50000, images: [] }, // không sale
+  { id: 'a1', name: 'Sản phẩm A', price: 800, originalPrice: 1200, images: [] },
+  { id: 'b2', name: 'Sản phẩm B', price: 50, originalPrice: 50, images: [] },
 ];
 
 test('render tên + giá bán + ảnh (alt=tên); gạch giá gốc khi đang sale', () => {
-  renderWithProviders(<ProductList products={products} emptyLabel="No products" />);
+  renderWithProviders(<ProductList products={products} emptyLabel="No products" locale="en" />);
   expect(screen.getByText('Sản phẩm A')).toBeInTheDocument();
-  expect(screen.getByText('800.000 ₫')).toBeInTheDocument();
-  expect(screen.getByText('1.200.000 ₫').tagName).toBe('DEL'); // giá gốc gạch ngang
+  expect(screen.getByText('$800.00')).toBeInTheDocument();
+  expect(screen.getByText('$1,200.00').tagName).toBe('DEL'); // giá gốc gạch ngang
   // folder 20: next/image render <img alt={name}> (ảnh placeholder picsum vì images rỗng).
   expect(screen.getByAltText('Sản phẩm A')).toBeInTheDocument();
 });
 
 test('KHÔNG gạch khi giá gốc = giá bán', () => {
-  renderWithProviders(<ProductList products={[products[1]!]} emptyLabel="No products" />);
-  expect(screen.getByText('50.000 ₫')).toBeInTheDocument();
-  expect(screen.queryByText('50.000 ₫', { selector: 'del' })).not.toBeInTheDocument();
+  renderWithProviders(
+    <ProductList products={[products[1]!]} emptyLabel="No products" locale="en" />,
+  );
+  expect(screen.getByText('$50.00')).toBeInTheDocument();
+  expect(screen.queryByText('$50.00', { selector: 'del' })).not.toBeInTheDocument();
 });
 
 test('danh sách rỗng → hiện emptyLabel', () => {
-  renderWithProviders(<ProductList products={[]} emptyLabel="Chưa có sản phẩm" />);
+  renderWithProviders(<ProductList products={[]} emptyLabel="Chưa có sản phẩm" locale="vi" />);
   expect(screen.getByText('Chưa có sản phẩm')).toBeInTheDocument();
 });

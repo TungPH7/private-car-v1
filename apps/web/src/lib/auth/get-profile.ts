@@ -2,12 +2,13 @@ import 'server-only';
 
 import { cache } from 'react';
 
+import { AUTH_ENDPOINTS } from '~/lib/auth/api-endpoints';
 import { profileSchema, type AuthUser } from '~/lib/auth/profile';
 import { getSession } from '~/lib/auth/session';
 import { httpGet } from '~/lib/http/client';
 
 /**
- * DAL hồ sơ người dùng — `GET /profile` (`@ApiBearerAuth`) → user + role + permissions. `server-only`.
+ * Profile DAL — `GET /api/users/me` (Bearer) → user + role + permissions. `server-only`.
  *
  * ⭐ Bọc `cache()` (React): DEDUP trong CÙNG một request → nhiều `<Can>` + guard trên một trang chỉ
  * gọi `/profile` MỘT lần (quan trọng vì backend rate-limit). Ngoài request (vd unit test) cache không
@@ -20,7 +21,7 @@ export const getProfile = cache(async (): Promise<AuthUser | null> => {
   const session = await getSession();
   if (!session) return null;
   try {
-    return await httpGet('/profile', profileSchema, {
+    return await httpGet(AUTH_ENDPOINTS.me, profileSchema, {
       headers: { Authorization: `Bearer ${session.accessToken}` },
     });
   } catch {

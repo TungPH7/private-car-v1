@@ -1,62 +1,93 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// E2E AUTH (MSW-in-server, folder 15 + 24) — login THẬT qua Server Action → niêm phong cookie phiên
-// bằng jose → AuthStatus + RBAC element-level (`<Can>`). Mock trả token ADMIN + `/profile` có quyền xoá.
-// Chứng minh cả pipeline auth server-first trong trình duyệt THẬT (unit chỉ test rời từng mảnh: seal,
-// action, permissions). Cookie `__Host-session` là Secure → Chromium chấp nhận trên http://localhost
-// (secure-context), giống ghi chú ở lib/auth/session.ts.
+import {
+  adminCredentials,
+  type AdminCredentials,
+  createProducts,
+  NO_ADMIN,
+  runId,
+} from './support/api';
 
-async function login(page: Page): Promise<void> {
+// Sign-in, RBAC and sign-out against the real Java API (PCAR-5), with the admin account of the API.
+async function signIn(page: Page, admin: AdminCredentials): Promise<void> {
   await page.goto('/en/login');
-  await page.getByLabel('Email').fill('admin@e2e.test');
-  await page.getByLabel('Password').fill('any-password'); // mock chấp nhận mọi mật khẩu
-  // Nút submit tên "Sign in" (button) — phân biệt với link "Sign in" của AuthStatus (role khác).
+  await page.getByLabel('Email').fill(admin.email);
+  await page.getByLabel('Password').fill(admin.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/en$/); // loginAction redirect về '/' theo locale hiện tại.
+  await expect(page).toHaveURL(/\/en$/); // loginAction redirects to '/' of the current locale.
 }
 
-test.describe('auth: login, RBAC, logout', () => {
-  // Reset store MSW-in-server TRƯỚC mỗi test (và mỗi retry) → test xoá bên dưới luôn thấy `E2E Deletable`
-  // dù Playwright dùng chung 1 server cho cả run (folder 25). `request` = APIRequestContext (dùng baseURL).
-  test.beforeEach(async ({ request }) => {
-    await request.post('/api/e2e/reset');
+test.describe('auth: sign in, RBAC, sign out', () => {
+  const admin = adminCredentials();
+  const run = runId();
+  let remove: (() => Promise<void>) | undefined;
+
+  test.beforeAll(async () => {
+    if (!admin) return;
+    ({ remove } = await createProducts(admin, [
+      { name: `E2E Kept ${run}`, slug: `e2e-kept-${run}`, price: 12 },
+      { name: `E2E Deletable ${run}`, slug: `e2e-deletable-${run}`, price: 3 },
+    ]));
   });
 
-  test('login → hiển thị trạng thái đăng nhập (ADMIN)', async ({ page }) => {
-    await login(page);
-    // AuthStatus (server, đọc getCurrentUser từ cookie) stream vào layout → role lấy từ claim token.
+  test.afterAll(async () => {
+    await remove?.();
+  });
+
+  test('a wrong password shows the credentials error and signs nobody in', async ({ page }) => {
+    await page.goto('/en/login');
+    await page.getByLabel('Email').fill('nobody@example.com');
+    await page.getByLabel('Password').fill('not the password');
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page.locator('form').getByRole('alert')).toBeVisible();
+    await expect(page).toHaveURL(/\/en\/login$/);
+  });
+
+  test('signing in shows the signed-in state with the role (ADMIN)', async ({ page }) => {
+    test.skip(!admin, NO_ADMIN); // reason: the test makes its data as the admin of the API, unknown on some environments
+    if (!admin) return;
+    await signIn(page, admin);
     await expect(page.getByText('Signed in (ADMIN)')).toBeVisible();
   });
 
-  test('đã đăng nhập → nút Xoá hiện trên /products (<Can> + RBAC server)', async ({ page }) => {
-    await login(page);
-    await page.goto('/en/products');
-    await expect(page.getByText('E2E Widget')).toBeVisible();
-    // <Can> gọi getProfile (mock có quyền DELETE) → nút Xoá render. Anon/thiếu quyền → ẩn (defense: backend
-    // vẫn chốt độc lập). Có nhiều dòng → chỉ cần ≥1 nút Delete hiện.
-    await expect(page.getByRole('button', { name: 'Delete' }).first()).toBeVisible();
+  test('anonymous: no Delete button on /products (<Can> + RBAC on the server)', async ({
+    page,
+  }) => {
+    test.skip(!admin, NO_ADMIN); // reason: the test makes its data as the admin of the API, unknown on some environments
+    await page.goto(`/en/products?name=${run}`);
+    await expect(page.getByText(`E2E Kept ${run}`)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
   });
 
-  test('xoá sản phẩm E2E: mutation → updateTag → re-render SERVER', async ({ page }) => {
-    await login(page);
-    await page.goto('/en/products');
-    const row = page.locator('li').filter({ hasText: 'E2E Deletable' });
+  test('signed in as ADMIN: the Delete button shows (product:delete of the API)', async ({
+    page,
+  }) => {
+    test.skip(!admin, NO_ADMIN); // reason: the test makes its data as the admin of the API, unknown on some environments
+    if (!admin) return;
+    await signIn(page, admin);
+    await page.goto(`/en/products?name=${run}`);
+    const row = page.locator('li').filter({ hasText: `E2E Kept ${run}` });
+    await expect(row.getByRole('button', { name: 'Delete' })).toBeVisible();
+  });
+
+  test('deleting a product: mutation → API → updateTag → server re-render', async ({ page }) => {
+    test.skip(!admin, NO_ADMIN); // reason: the test makes its data as the admin of the API, unknown on some environments
+    if (!admin) return;
+    await signIn(page, admin);
+    await page.goto(`/en/products?name=${run}`);
+    const row = page.locator('li').filter({ hasText: `E2E Deletable ${run}` });
     await expect(row).toBeVisible();
-
     await row.getByRole('button', { name: 'Delete' }).click();
-    // deleteProductAction: validate → re-authz (getCurrentUser) → DAL delete (MSW splice store) →
-    // updateTag('products') → render kế đọc lại getProducts → danh sách KHÔNG còn dòng đó.
-    // Timeout 20s (KHÔNG mặc định 5s): response của Server Action mang theo re-render read-your-writes
-    // (getProducts + <Can>/getProfile mỗi dòng) → trên CI runner 2-core nguội có thể >5s (bài học folder 25).
-    await expect(page.getByText('E2E Deletable')).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.getByText(`E2E Deletable ${run}`)).toHaveCount(0, { timeout: 20_000 });
+    await expect(page.getByText(`E2E Kept ${run}`)).toBeVisible();
   });
 
-  test('logout → quay lại "Sign in"', async ({ page }) => {
-    await login(page);
-    await page.goto('/en');
+  test('signing out → back to "Sign in"', async ({ page }) => {
+    test.skip(!admin, NO_ADMIN); // reason: the test makes its data as the admin of the API, unknown on some environments
+    if (!admin) return;
+    await signIn(page, admin);
     await expect(page.getByText('Signed in (ADMIN)')).toBeVisible();
     await page.getByRole('button', { name: 'Sign out' }).click();
-    // logoutAction xoá cookie + redirect '/' → AuthStatus render lại thành link "Sign in".
     await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
   });
 });
