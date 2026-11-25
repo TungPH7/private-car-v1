@@ -1,0 +1,88 @@
+# The config of this project (SPEC-project-scaffold.md 2.1), written by ao-kit init from the profile base-pnpm.
+name: private-car-v1
+package_manager: pnpm
+jira:
+  space: PCAR
+github:
+  repo: TungPH7/private-car-v1
+  approvers:
+    - TungPH7
+  apps:
+    dev: tungph7-ao-dev
+    dev_id: 5514949
+    review: tungph7-ao-review
+    review_id: 5514961
+    merge: tungph7-ao-merge
+    merge_id: 5756976
+  kit_peers: []
+repos:
+  - name: private-car-v1
+    path: .
+apps:
+  web:
+    repo: private-car-v1
+    path: apps/web
+    profile: nextjs
+    dev: pnpm --filter ./apps/web run dev
+    port:
+      env: PORT
+      default: 3000
+    health: /en
+    public: true
+    seo: true
+    # The localhost URLs the apps give each other, here so that a lane moves them by its offset.
+    env:
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      API_URL: http://localhost:3001
+    hosts:
+      development: private-car-v1-dev.ao.t2g.io.vn
+      staging: private-car-v1-staging.ao.t2g.io.vn
+      production: private-car-v1.ao.t2g.io.vn
+  admin:
+    repo: private-car-v1
+    path: apps/admin
+    profile: react
+    dev: pnpm --filter ./apps/admin run dev
+    port:
+      env: PORT
+      default: 5173
+    health: /
+    env:
+      API_URL: http://localhost:3001
+  api:
+    repo: private-car-v1
+    path: apps/api
+    profile: spring-boot
+    dev: pnpm --filter ./apps/api run dev
+    port:
+      env: PORT
+      default: 3001
+    health: /actuator/health
+    env:
+      APP_SECURITY_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000
+    # The <excludes> of jacoco-maven-plugin in apps/api/pom.xml, as source paths; MapperImpl is generated in target/.
+    coverage_exclude:
+      - src/main/java/com/tungph7/learnpostgres/LearnPostgresqlApiApplication.java
+      - src/main/java/com/tungph7/learnpostgres/feature/**/dto/**
+      - src/main/java/com/tungph7/learnpostgres/common/dto/**
+      - src/main/java/com/tungph7/learnpostgres/common/config/**
+      - src/main/java/**/*Properties.java
+      - src/main/java/com/tungph7/learnpostgres/common/error/ErrorCode.java
+      - src/main/java/com/tungph7/learnpostgres/common/error/ProblemDetailOpenApiCustomizer.java
+      - src/main/java/com/tungph7/learnpostgres/common/error/BadRequestException.java
+      - src/main/java/com/tungph7/learnpostgres/common/domain/CitextType.java
+roles:
+  optional: []
+review:
+  default: "off"
+runs:
+  worktrees: true
+  lanes_max: 3
+  budget_usd: 50
+  idle_hours: 8
+  agents_per_role:
+    be-dev: 3
+    fe-dev: 3
+    devops: 3
+claude:
+  allow: []
