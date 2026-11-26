@@ -11,6 +11,7 @@ Tất cả thay đổi đáng chú ý của bộ tài liệu coding convention �
 
 **Added**
 
+- `16-testing.md` — **TE-022**: request qua proxy `/api` được kiểm kèm header `Origin` (`e2e/api-proxy.spec.ts`); Caddy trong image tin Caddy của VPS (`trusted_proxies`) (PCAR-6).
 - `16-testing.md` — **TE-021**: E2E đăng nhập bằng tài khoản admin của nơi nó chạy (admin bootstrap của `apps/api/.env` trên máy; `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD` trên môi trường, hai biến user mà qa cần) (PCAR-6).
 
 ---

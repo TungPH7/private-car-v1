@@ -120,3 +120,11 @@ pnpm exec playwright test --project admin
 ```
 
 Lý do: admin của máy và admin của môi trường là hai tài khoản khác nhau. Ưu tiên `E2E_ADMIN_*` ở mọi nơi làm E2E trên máy đỏ khi qa đặt chúng; bỏ qua chúng làm `/ao-qa` đăng nhập bằng admin của máy, và đỏ trên môi trường.
+
+### TE-022 [MUST] Request qua proxy `/api` được kiểm kèm header `Origin`
+
+Trình duyệt gửi `Origin` với mọi POST, PUT, DELETE, kể cả khi cùng origin, và `api` từ chối request khác origin mà nó không liệt kê (403 "Invalid CORS request"). `e2e/api-proxy.spec.ts` gửi `Origin` của admin qua `/api`: đăng nhập sai phải trả 401, đăng nhập đúng trả 200, trên máy cũng như trên Development và Staging qua `/ao-qa`.
+
+Request qua `/api` cùng origin trên mọi môi trường vì Caddy trong image (`Caddyfile`) tin Caddy của VPS đứng trước nó (`trusted_proxies`), nên `api` (`server.forward-headers-strategy: native`) thấy đúng scheme `https` và host của admin. Không khai origin của admin trong `api`.
+
+Lý do: lỗi 403 này lọt qua vòng 2 của PCAR-6 vì E2E trên máy chạy Vite dev server qua HTTP, cùng scheme với `api`, và không ai gửi request kèm `Origin` qua image sau TLS.
