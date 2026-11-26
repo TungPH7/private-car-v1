@@ -6,7 +6,7 @@ import { expect, test } from 'vitest';
 import { z } from 'zod';
 
 import { ApiError } from '~/lib/http/api-error';
-import { httpDelete, httpGet } from '~/lib/http/client';
+import { httpDelete, httpGet, httpSendNoContent } from '~/lib/http/client';
 import { server } from '~/testing/msw/server';
 
 // `httpGet` đọc `env.API_URL` = 'https://api.example.test' trong Vitest (folder 07 `test.env`).
@@ -56,4 +56,42 @@ test('forward init.headers (auth seam folder 15) xuống fetch', async () => {
   );
   await httpDelete('/items/1', msgSchema, { headers: { Authorization: 'Bearer t' } });
   expect(authHeader).toBe('Bearer t');
+});
+
+// --- No content (204): sign out, password change, delete of the Java API ------------------
+test('a 204 resolves with nothing and sends the method, headers and body', async () => {
+  let seen: { method: string; auth: string | null; body: string } | null = null;
+  server.use(
+    http.post(`${BASE}/api/auth/revocations`, async ({ request }) => {
+      seen = {
+        method: request.method,
+        auth: request.headers.get('authorization'),
+        body: await request.text(),
+      };
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+
+  await expect(
+    httpSendNoContent('POST', '/api/auth/revocations', {
+      headers: { Authorization: 'Bearer t', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: 'r' }),
+    }),
+  ).resolves.toBeUndefined();
+  expect(seen).toEqual({ method: 'POST', auth: 'Bearer t', body: '{"refreshToken":"r"}' });
+});
+
+test('a non-2xx answer to a no-content request is an ApiError with its status', async () => {
+  server.use(http.delete(`${BASE}/api/products/x`, () => new HttpResponse(null, { status: 403 })));
+  await expect(httpSendNoContent('DELETE', '/api/products/x')).rejects.toMatchObject({
+    kind: 'http',
+    status: 403,
+  });
+});
+
+test('a no-content request that cannot reach the server is a network ApiError', async () => {
+  server.use(http.put(`${BASE}/api/users/me/password`, () => HttpResponse.error()));
+  await expect(httpSendNoContent('PUT', '/api/users/me/password')).rejects.toMatchObject({
+    kind: 'network',
+  });
 });

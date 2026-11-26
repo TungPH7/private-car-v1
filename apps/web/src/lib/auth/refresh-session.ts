@@ -1,12 +1,14 @@
 import 'server-only';
 
+import { AUTH_ENDPOINTS, GRANT_TYPE } from '~/lib/auth/api-endpoints';
 import { createSession, getSession } from '~/lib/auth/session';
 import { sessionTokensSchema, type SessionTokens } from '~/lib/auth/session-seal';
 import { httpPost } from '~/lib/http/client';
 
 /**
- * Refresh-ROTATION — `POST /auth/refresh-token`. Backend XOAY: refresh token cũ bị xoá; dùng lại →
- * `RefreshTokenAlreadyUsed`. Đọc refresh token từ phiên → đổi cặp token mới → NIÊM PHONG LẠI cookie.
+ * Refresh ROTATION — `POST /api/auth/tokens` with the refresh_token grant. The API rotates: the old
+ * refresh token is spent, and reusing it revokes every token of the account. Reads the refresh
+ * token of the session → exchanges it for a new pair → RESEALS the cookie.
  *
  * ⭐⭐ CHỈ gọi được nơi SET được cookie: **Route Handler / Server Action** — KHÔNG phải lúc RSC render
  * (render không set được cookie). Vì vậy refresh sống ở Route Handler `/api/auth/refresh` (có thể gọi
@@ -20,9 +22,12 @@ export async function refreshSession(): Promise<SessionTokens | null> {
   if (!session) return null;
   let next: SessionTokens;
   try {
-    next = await httpPost('/auth/refresh-token', sessionTokensSchema, {
+    next = await httpPost(AUTH_ENDPOINTS.tokens, sessionTokensSchema, {
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: session.refreshToken }),
+      body: JSON.stringify({
+        grantType: GRANT_TYPE.refreshToken,
+        refreshToken: session.refreshToken,
+      }),
     });
   } catch {
     return null; // refresh token hết hạn / đã dùng → caller xử lý (xoá phiên + login)

@@ -6,8 +6,11 @@ import {
   type ProfileFormState,
 } from '~/features/auth/model/profile-form';
 import { changePassword } from '~/features/auth/server/change-password';
+import { login } from '~/features/auth/server/login';
 import { updateProfile } from '~/features/auth/server/update-profile';
 import { getCurrentUser } from '~/lib/auth/get-current-user';
+import { getProfile } from '~/lib/auth/get-profile';
+import { createSession } from '~/lib/auth/session';
 import { isApiError } from '~/lib/http/api-error';
 import { getFieldErrorCodes } from '~/lib/validation/format-zod-error';
 
@@ -59,5 +62,22 @@ export async function changePasswordAction(input: unknown): Promise<ProfileFormS
     return { status: 'error', reason: 'unknown' };
   }
 
+  await keepThisSession(parsed.data.newPassword);
   return { status: 'success' };
+}
+
+/**
+ * The API revokes every refresh token of the account on a password change, the one of this
+ * session too: other devices sign in again, and this one would end at its next refresh. Signing in
+ * with the new password reseals a fresh pair, so the user who changed it stays signed in. Best
+ * effort: on a failure the password is changed all the same, and the session ends later.
+ */
+async function keepThisSession(newPassword: string): Promise<void> {
+  const profile = await getProfile();
+  if (!profile) return;
+  try {
+    await createSession(await login({ email: profile.email, password: newPassword }));
+  } catch {
+    // The change succeeded; this session simply ends at its next refresh.
+  }
 }

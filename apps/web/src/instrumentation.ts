@@ -15,24 +15,14 @@ import { captureError } from '~/lib/monitoring/capture-error';
  * chỉ thực thi khi runtime đúng. Đổi sink TRƯỚC boot-log → ngay dòng `server.boot` đã đi qua pino (bằng
  * chứng swap thành công). edge/client KHÔNG chạy nhánh này → giữ `consoleSink` isomorphic (folder 18).
  *
- * ⭐ Folder 24 — BẬT MSW-in-server cho E2E: khi `E2E_API_MOCKING==='1'` (chỉ tiến trình `next start` của
- * Playwright set — xem playwright.config), nạp MSW/node ngay tại đây → nó patch http client Node của
- * CHÍNH process này ⇒ mọi fetch của DAL (server→backend) bị chặn bằng mock tất định. Đây là cách DUY
- * NHẤT mock được data server-render (page.route trình duyệt không thấy fetch phía server). Dynamic import
- * + cờ gate ⇒ build/dev/prod THẬT không bao giờ nạp code test.
+ * E2E runs against the real Java API that Playwright starts (PCAR-5): no mock is loaded here.
  */
 export async function register(): Promise<void> {
   // `NEXT_RUNTIME` do Next tiêm ('nodejs' | 'edge') — đánh dấu runtime, KHÔNG phải app config nên
-  // không đưa vào schema env (đọc `process.env` trực tiếp ở đây là hợp lệ, hiếm hoi — như `E2E_API_MOCKING`).
+  // không đưa vào schema env (đọc `process.env` trực tiếp ở đây là hợp lệ, hiếm hoi).
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { pinoSink } = await import('~/lib/logger/pino-sink');
     configureLoggerSink(pinoSink);
-
-    if (process.env.E2E_API_MOCKING === '1') {
-      const { startE2eApiMocks } = await import('~/testing/msw/e2e-server');
-      startE2eApiMocks();
-      logger.warn('e2e.api-mocking.enabled');
-    }
   }
   logger.info('server.boot', { runtime: process.env.NEXT_RUNTIME ?? 'nodejs' });
 }

@@ -1,18 +1,19 @@
 import { getTranslations } from 'next-intl/server';
 
 import { requireUser } from '~/lib/auth/guards';
+import { PERMISSION_MODULE } from '~/lib/auth/api-endpoints';
 import { hasModule } from '~/lib/auth/permissions';
 import { Link } from '~/i18n/navigation';
 
 /**
  * Nội dung trang tài khoản — async Server Component. `requireUser()` chặn: chưa đăng nhập → redirect
  * /login. Đặt trong `<Suspense>` ở page (đọc cookie ⇒ dynamic). Hiển thị hồ sơ + minh hoạ predicate
- * `hasModule` (badge "quản lý sản phẩm" cho ADMIN/SELLER — module MANAGE-PRODUCT; ẩn với CLIENT).
+ * `hasModule` (badge "quản lý sản phẩm" cho ADMIN — module product của API; ẩn với CUSTOMER).
  */
 export async function AccountDetails() {
   const t = await getTranslations('Account');
   const user = await requireUser();
-  const canManageProducts = hasModule(user.role.permissions, 'MANAGE-PRODUCT');
+  const canManageProducts = hasModule(user.role.permissions, PERMISSION_MODULE.product);
 
   return (
     <>

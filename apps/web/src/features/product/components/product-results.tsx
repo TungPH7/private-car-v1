@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 
 import { Can } from '~/components/can';
 import { DensityScope } from '~/components/density-scope';
@@ -41,6 +41,7 @@ export async function ProductResults({
 }) {
   const t = await getTranslations('Products');
   const tv = await getTranslations('Validation');
+  const locale = await getLocale();
   const query = parseSearchParams(productListQuerySchema, await searchParams);
 
   // ⭐ Lỗi DỰ KIẾN (429 rate-limit) → mô hình hoá bằng `Result` (folder 17), KHÔNG để sập trang. `catch`
@@ -85,7 +86,7 @@ export async function ProductResults({
           sortOptions: {
             createdAt: t('sortCreatedAt'),
             price: t('sortPrice'),
-            sale: t('sortSale'),
+            name: t('sortName'),
           },
           orderOptions: { asc: t('orderAsc'), desc: t('orderDesc') },
         }}
@@ -106,6 +107,7 @@ export async function ProductResults({
               <ProductList
                 products={result.value.items}
                 emptyLabel={t('empty')}
+                locale={locale}
                 renderItemActions={(product) => (
                   <>
                     {/* ⭐ Folder 20 — island next/dynamic (zoom ảnh): cho MỌI người, đặt NGOÀI <Can>. */}
@@ -115,8 +117,8 @@ export async function ProductResults({
                       label={t('zoom')}
                       closeLabel={t('zoomClose')}
                     />
-                    {/* ⭐ Authz element-level: nút Xoá CHỈ hiện nếu user có quyền DELETE sản phẩm (ADMIN/
-                        SELLER). CLIENT/anon → ẩn. Backend vẫn chặn 401/403 độc lập (defense-in-depth). */}
+                    {/* ⭐ Authz element-level: nút Xoá CHỈ hiện nếu user có quyền product:delete của API
+                        (ADMIN). CUSTOMER/anon → ẩn. Backend vẫn chặn 401/403 độc lập (defense-in-depth). */}
                     <Can
                       method={DELETE_PRODUCT_PERMISSION.method}
                       path={DELETE_PRODUCT_PERMISSION.path}

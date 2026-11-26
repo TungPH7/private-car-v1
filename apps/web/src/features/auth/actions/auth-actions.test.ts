@@ -69,7 +69,7 @@ test('đăng nhập OK → createSession(tokens) + redirect("/")', async () => {
 
 test('logout có phiên → thu hồi backend + xoá cookie + redirect', async () => {
   mockedGetSession.mockResolvedValue(TOKENS);
-  mockedLogout.mockResolvedValue({ message: 'ok' });
+  mockedLogout.mockResolvedValue(undefined);
   await logoutAction();
   expect(mockedLogout).toHaveBeenCalledWith(TOKENS);
   expect(mockedDelete).toHaveBeenCalled();

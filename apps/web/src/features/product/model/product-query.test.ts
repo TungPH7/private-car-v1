@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   productListQuerySchema,
+  productQueryToApiParams,
   productQueryToParams,
   productSearchNameSchema,
 } from '~/features/product/model/product-query';
@@ -59,5 +60,33 @@ describe('productQueryToParams (→ URL gọn, bỏ mặc định)', () => {
   it('chỉ giữ giá trị KHÁC mặc định', () => {
     const q = productListQuerySchema.parse({ page: '2', name: 'Áo', sortBy: 'price' });
     expect(productQueryToParams(q)).toEqual({ page: '2', name: 'Áo', sortBy: 'price' });
+  });
+});
+
+describe('productQueryToApiParams (→ GET /api/products of the Java API)', () => {
+  it('defaults → page 0, the page size, newest first', () => {
+    const params = productQueryToApiParams(productListQuerySchema.parse({}), 10);
+    expect(Object.fromEntries(params)).toEqual({ page: '0', size: '10', sort: 'createdAt,desc' });
+  });
+
+  it('the 1-based page of the UI becomes the 0-based page of the API, with sort and name', () => {
+    const q = productListQuerySchema.parse({
+      page: '3',
+      name: 'Áo',
+      sortBy: 'price',
+      orderBy: 'asc',
+    });
+    expect(Object.fromEntries(productQueryToApiParams(q, 10))).toEqual({
+      page: '2',
+      size: '10',
+      sort: 'price,asc',
+      name: 'Áo',
+    });
+  });
+
+  it('sorts by name, which the API offers (it has no "on sale" order)', () => {
+    const q = productListQuerySchema.parse({ sortBy: 'name', orderBy: 'asc' });
+    expect(productQueryToApiParams(q, 10).get('sort')).toBe('name,asc');
+    expect(productListQuerySchema.parse({ sortBy: 'sale' }).sortBy).toBe('createdAt');
   });
 });

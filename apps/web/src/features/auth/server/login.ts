@@ -1,17 +1,18 @@
 import 'server-only';
 
 import { loginResponseSchema, type LoginInput } from '~/features/auth/model/auth';
+import { AUTH_ENDPOINTS, GRANT_TYPE } from '~/lib/auth/api-endpoints';
 import { type SessionTokens } from '~/lib/auth/session-seal';
 import { httpPost } from '~/lib/http/client';
 
 /**
- * DAL đăng nhập (BFF) — `POST /auth/login` (public) → `{ accessToken, refreshToken }`. `server-only`.
- * Validate response ở biên (folder 11). KHÔNG set cookie ở đây (DAL không set được cookie); Server
- * Action gọi `createSession` sau khi nhận token.
+ * Sign-in DAL (BFF) — `POST /api/auth/tokens` with the password grant (public) →
+ * `{ accessToken, refreshToken }`. `server-only`. The response is validated at the boundary; the
+ * DAL sets no cookie: the Server Action calls `createSession` with the tokens.
  */
 export function login(input: LoginInput): Promise<SessionTokens> {
-  return httpPost('/auth/login', loginResponseSchema, {
+  return httpPost(AUTH_ENDPOINTS.tokens, loginResponseSchema, {
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ grantType: GRANT_TYPE.password, ...input }),
   });
 }

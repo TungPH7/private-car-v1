@@ -9,7 +9,7 @@ import {
 import { deleteProductAction } from '~/features/product/actions/product-actions';
 
 interface DeleteProductButtonProps {
-  productId: number;
+  productId: string;
   label: string;
   /** Copy đã localize cho từng lý do thất bại (server map sẵn → client chỉ tra cứu). */
   messages: Record<DeleteFailureReason, string>;

@@ -21,9 +21,21 @@ apps:
     public: true
     memory: 768m
     start_timeout: 180
-    # From /etc/ao/secrets/private-car-v1/<environment>.env: the profile of the environment, and the app user of its
-    # database (docs/vps-setup.md, section 14 of the kit).
-    env: [ SPRING_PROFILES_ACTIVE, DB_HOST, DB_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD ]
+    # From /etc/ao/secrets/private-car-v1/<environment>.env: the profile of the environment, the app user of its
+    # database (docs/vps-setup.md, section 14 of the kit), the key that signs the access tokens, so they outlive a
+    # restart, and the first admin account, created at start when its email has no account (docs/adr/0001).
+    env:
+      [
+        SPRING_PROFILES_ACTIVE,
+        DB_HOST,
+        DB_PORT,
+        POSTGRES_DB,
+        POSTGRES_USER,
+        POSTGRES_PASSWORD,
+        APP_AUTH_JWT_SECRET,
+        APP_AUTH_BOOTSTRAP_ADMIN_EMAIL,
+        APP_AUTH_BOOTSTRAP_ADMIN_PASSWORD,
+      ]
 # One PostgreSQL container for each environment, alias db, kept apart from the deploys. Its variables come from
 # /etc/ao/secrets/private-car-v1/<environment>.db.env; the init scripts run once, on a new volume.
 database:

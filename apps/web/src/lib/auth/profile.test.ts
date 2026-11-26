@@ -1,56 +1,44 @@
 import { expect, test } from 'vitest';
 
 import { profileSchema } from '~/lib/auth/profile';
+import { ADMIN_ID, ADMIN_PROFILE } from '~/testing/api-fixtures';
 
-// Shape THẬT backend trả (GetUserProfileResSchema) — nhiều field hơn DTO ta cần.
-const BACKEND_PROFILE = {
-  id: 1,
-  email: 'admin@shop.com',
-  name: 'Admin',
-  phoneNumber: '',
-  avatar: null,
-  status: 'ACTIVE',
-  role: {
-    id: 2,
-    name: 'ADMIN',
-    permissions: [
-      {
-        id: 9,
-        name: 'Delete product',
-        description: '',
-        module: 'MANAGE-PRODUCT',
-        path: '/manage-product/products/:productId',
-        method: 'DELETE',
-      },
-    ],
-  },
-};
-
-test('profileSchema: parse OK + BỎ field thừa (DTO tối thiểu)', () => {
-  const r = profileSchema.safeParse(BACKEND_PROFILE);
+test('profileSchema keeps what the UI needs from GET /api/users/me', () => {
+  const r = profileSchema.safeParse({
+    ...ADMIN_PROFILE,
+    phoneNumber: '+84901234567',
+    avatar: 'https://example.com/a.png',
+  });
   expect(r.success).toBe(true);
   if (r.success) {
     expect(r.data).toEqual({
-      id: 1,
-      email: 'admin@shop.com',
+      id: ADMIN_ID,
+      email: 'admin@example.com',
       name: 'Admin',
-      phoneNumber: '', // folder 16: DTO mở rộng thêm phoneNumber + avatar (form sửa hồ sơ cần)
-      avatar: null,
+      phoneNumber: '+84901234567',
+      avatar: 'https://example.com/a.png',
       role: {
         name: 'ADMIN',
         permissions: [
-          {
-            module: 'MANAGE-PRODUCT',
-            path: '/manage-product/products/:productId',
-            method: 'DELETE',
-          },
+          { module: 'product', method: 'POST', path: '/api/products' },
+          { module: 'product', method: 'DELETE', path: '/api/products/{id}' },
+          { module: 'product', method: 'PUT', path: '/api/products/{id}' },
         ],
       },
     });
-    expect('status' in r.data).toBe(false); // field thừa (status) vẫn bị strip → DTO tối thiểu
+    // The permission name of the API is not part of the DTO: the UI matches method and path.
+    expect('name' in (r.data.role.permissions[0] ?? {})).toBe(false);
   }
 });
 
-test('profileSchema: thiếu role → fail (validate ở biên bắt drift)', () => {
-  expect(profileSchema.safeParse({ id: 1, email: 'a@b.com', name: 'X' }).success).toBe(false);
+test('profileSchema: a missing phone number (null) becomes an empty string for the form', () => {
+  const r = profileSchema.parse(ADMIN_PROFILE);
+  expect(r.phoneNumber).toBe('');
+  expect(r.avatar).toBeNull();
+});
+
+test('profileSchema: no role → fail (validation at the boundary catches drift)', () => {
+  expect(profileSchema.safeParse({ id: ADMIN_ID, email: 'a@b.com', name: 'X' }).success).toBe(
+    false,
+  );
 });

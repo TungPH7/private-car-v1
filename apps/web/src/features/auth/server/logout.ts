@@ -1,22 +1,19 @@
 import 'server-only';
 
-import { messageResponseSchema } from '~/features/auth/model/auth';
+import { AUTH_ENDPOINTS } from '~/lib/auth/api-endpoints';
 import { type SessionTokens } from '~/lib/auth/session-seal';
-import { httpPost } from '~/lib/http/client';
+import { httpSendNoContent } from '~/lib/http/client';
 
 /**
- * DAL đăng xuất (BFF) — `POST /auth/logout` (`@ApiBearerAuth`): cần Bearer access token + body
- * `{ refreshToken }` → backend thu hồi refresh token + đánh dấu device đã logout. `server-only`.
+ * Sign-out DAL (BFF) — `POST /api/auth/revocations` with `{ refreshToken }` → 204: the API
+ * revokes that refresh token. `server-only`.
  *
- * Best-effort: Server Action vẫn xoá cookie phía ta KỂ CẢ khi gọi này lỗi (refresh token có thể đã
- * hết hạn / đã dùng) → người dùng luôn đăng xuất được ở phía frontend.
+ * Best effort: the Server Action deletes our cookie even when this call fails (the refresh token
+ * may be expired or spent already), so the user can always sign out on the frontend.
  */
-export function logout(tokens: SessionTokens): Promise<{ message: string }> {
-  return httpPost('/auth/logout', messageResponseSchema, {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${tokens.accessToken}`,
-    },
+export function logout(tokens: SessionTokens): Promise<void> {
+  return httpSendNoContent('POST', AUTH_ENDPOINTS.revocations, {
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken: tokens.refreshToken }),
   });
 }
