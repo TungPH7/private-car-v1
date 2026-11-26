@@ -73,7 +73,12 @@ Hai bẫy cô lập state phải nhớ:
 ## 17.8 E2E — `[MUST]`
 
 - **Chạy bằng `playwright.config.ts` ở gốc repo** (của ai-orchestrator): nó bật mọi app theo `.ai-orchestrator/project.yaml`, kể cả `api` Java và Postgres, và dời cổng theo `AO_PORT_OFFSET` khi chạy trong làn. `/ao-qa` chạy cùng spec trên Development hoặc Staging.
-- **Không mock backend** (PCAR-5): E2E chạy trên **`api` Java thật**, vì trên môi trường không có mock nào nạp được. Test tự tạo dữ liệu qua API bằng `e2e/support/api.ts` (tài khoản quản trị: `E2E_ADMIN_*`, hoặc `APP_AUTH_BOOTSTRAP_ADMIN_*` của `apps/api/.env`), gắn **run id** vào tên và mở trang kèm bộ lọc theo run id đó, rồi xoá ở `afterAll`. Không có tài khoản quản trị → test cần nó `test.skip` kèm lý do.
+- **Không mock backend** (PCAR-5): E2E chạy trên **`api` Java thật**, vì trên môi trường không có mock nào nạp được. Test tự tạo dữ liệu qua API bằng `e2e/support/api.ts`, gắn **run id** vào tên và mở trang kèm bộ lọc theo run id đó, rồi xoá ở `afterAll`.
+- **Tài khoản quản trị theo nơi chạy** (PCAR-5 vòng 2):
+  - **Trên máy** (không có `E2E_BASE_URL`): luôn là admin bootstrap của `apps/api/.env` (`APP_AUTH_BOOTSTRAP_ADMIN_*`), mà `api` do Playwright bật tạo lúc khởi động — kể cả khi `E2E_ADMIN_*` có trong môi trường.
+  - **Trên một môi trường** (có `E2E_BASE_URL`, như lúc `/ao-qa` chạy): `E2E_ADMIN_EMAIL` và `E2E_ADMIN_PASSWORD`. `qa` cần hai biến user này, là admin **của môi trường được kiểm** (Development hay Staging).
+  - Không có tài khoản quản trị → test cần nó `test.skip` kèm lý do (`NO_ADMIN`, ghi rõ biến cần đặt ở nơi đang chạy).
+- Logic chọn tài khoản là hàm thuần (`adminCredentialsFrom`, `noAdminReason`), có test Playwright không cần trình duyệt ở `e2e/support/api.spec.ts` (Vitest chỉ chạy `src/**`).
 - Mỗi test chỉ thấy dữ liệu của chính nó → chạy **song song** được (`fullyParallel`).
 - Query theo **vai trò** như RTL.
 - a11y: `@axe-core/playwright` quét WCAG A/AA — **bổ trợ** cho `jsx-a11y` (tĩnh), không thay thế.
