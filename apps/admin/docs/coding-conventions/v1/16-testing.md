@@ -102,3 +102,21 @@ Dùng 4xx thay vì 5xx khi muốn kiểm màn hình lỗi — nếu không, test
 ### TE-020 [MUST] `pnpm test` và `pnpm e2e` không chạy ở pre-commit
 
 Quá chậm cho vòng lặp local ⇒ để CI (`19-tooling-git-ci.md`).
+
+### TE-021 [MUST] E2E đăng nhập bằng tài khoản admin của nơi nó chạy
+
+E2E của `admin` chạy trên `api` Java thật (PCAR-6), trên máy cũng như trên Development và Staging qua `/ao-qa`. Tài khoản admin chọn theo **base URL của test**, trong `e2e/support/admin-account.ts` (`adminAccount(baseURL)`):
+
+| Nơi chạy | Tài khoản | Thiếu tài khoản |
+|---|---|---|
+| Trên máy (admin chạy ở `localhost`, kể cả test gắn `@local` lúc `/ao-qa` chạy) | Admin bootstrap của `apps/api/.env` (`APP_AUTH_BOOTSTRAP_ADMIN_EMAIL`, `APP_AUTH_BOOTSTRAP_ADMIN_PASSWORD`), **kể cả khi** `E2E_ADMIN_*` có trong môi trường | Test `test.skip` kèm lý do |
+| Trên một môi trường (admin ở host của Development hay Staging) | `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD` | Test `test.skip` kèm lý do, **không** thử admin của máy |
+
+**qa cần hai biến user** `E2E_ADMIN_EMAIL` và `E2E_ADMIN_PASSWORD`, đặt bằng email và mật khẩu admin của **môi trường được kiểm** (Development hay Staging). Trên máy hai biến đó bị bỏ qua, nên đặt chúng ở mức user không làm đỏ E2E chạy trên máy.
+
+```bash
+# Git Bash, ở gốc repo: chạy E2E của admin trên máy, cần Docker cho api và Postgres.
+pnpm exec playwright test --project admin
+```
+
+Lý do: admin của máy và admin của môi trường là hai tài khoản khác nhau. Ưu tiên `E2E_ADMIN_*` ở mọi nơi làm E2E trên máy đỏ khi qa đặt chúng; bỏ qua chúng làm `/ao-qa` đăng nhập bằng admin của máy, và đỏ trên môi trường.
