@@ -5,6 +5,7 @@ import { type FormEvent, useState } from 'react';
 import {
   productSearchNameSchema,
   type ProductListQuery,
+  type ProductSortBy,
 } from '~/features/product/model/product-query';
 
 interface ProductFiltersProps {
@@ -15,7 +16,7 @@ interface ProductFiltersProps {
     sort: string;
     order: string;
     apply: string;
-    sortOptions: Record<'createdAt' | 'price' | 'sale', string>;
+    sortOptions: Record<ProductSortBy, string>;
     orderOptions: Record<'asc' | 'desc', string>;
   };
   /** code lỗi (vd `too_short`) → chuỗi đã dịch (server map sẵn — giống `messages` của DeleteProductButton). */
@@ -63,7 +64,7 @@ export function ProductFilters({ current, labels, errorMessages }: ProductFilter
         <select name="sortBy" defaultValue={current.sortBy}>
           <option value="createdAt">{labels.sortOptions.createdAt}</option>
           <option value="price">{labels.sortOptions.price}</option>
-          <option value="sale">{labels.sortOptions.sale}</option>
+          <option value="name">{labels.sortOptions.name}</option>
         </select>
       </label>{' '}
       <label>

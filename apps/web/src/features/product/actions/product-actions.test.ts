@@ -27,6 +27,9 @@ const mockedGetCurrentUser = vi.mocked(getCurrentUser);
 const mockedDeleteProduct = vi.mocked(deleteProduct);
 const mockedUpdateTag = vi.mocked(updateTag);
 
+/** Products of the Java API have UUID ids. */
+const PRODUCT_ID = '0193c1f4-7b9a-7a3c-8d2e-aa1c98dead29';
+
 function formDataWith(productId: string | null): FormData {
   const fd = new FormData();
   if (productId !== null) fd.set('productId', productId);
@@ -42,27 +45,33 @@ test('input sai → reason "validation"; KHÔNG re-authz, KHÔNG gọi backend',
 
 test('chưa đăng nhập → reason "auth"; KHÔNG gọi backend (secure-by-default)', async () => {
   mockedGetCurrentUser.mockResolvedValue(null);
-  const state = await deleteProductAction(initialProductActionState, formDataWith('29'));
+  const state = await deleteProductAction(initialProductActionState, formDataWith(PRODUCT_ID));
   expect(state).toEqual({ status: 'error', reason: 'auth' });
   expect(mockedDeleteProduct).not.toHaveBeenCalled();
   expect(mockedUpdateTag).not.toHaveBeenCalled();
 });
 
 test('đã đăng nhập + xoá OK → success + updateTag("products")', async () => {
-  mockedGetCurrentUser.mockResolvedValue({ id: 1, role: 'SELLER' });
+  mockedGetCurrentUser.mockResolvedValue({
+    id: '0193c1f4-7b9a-7a3c-8d2e-aa1c98dead10',
+    role: 'ADMIN',
+  });
   mockedDeleteProduct.mockResolvedValue(undefined);
-  const state = await deleteProductAction(initialProductActionState, formDataWith('29'));
-  expect(state).toEqual({ status: 'success', deletedId: 29 });
-  expect(mockedDeleteProduct).toHaveBeenCalledWith(29);
+  const state = await deleteProductAction(initialProductActionState, formDataWith(PRODUCT_ID));
+  expect(state).toEqual({ status: 'success', deletedId: PRODUCT_ID });
+  expect(mockedDeleteProduct).toHaveBeenCalledWith(PRODUCT_ID);
   expect(mockedUpdateTag).toHaveBeenCalledWith('products');
 });
 
 test('backend 401 (defense-in-depth) → reason "auth"; KHÔNG updateTag', async () => {
-  mockedGetCurrentUser.mockResolvedValue({ id: 1, role: 'SELLER' });
+  mockedGetCurrentUser.mockResolvedValue({
+    id: '0193c1f4-7b9a-7a3c-8d2e-aa1c98dead10',
+    role: 'ADMIN',
+  });
   mockedDeleteProduct.mockRejectedValue(
     new ApiError({ kind: 'http', status: 401, message: 'unauthorized' }),
   );
-  const state = await deleteProductAction(initialProductActionState, formDataWith('29'));
+  const state = await deleteProductAction(initialProductActionState, formDataWith(PRODUCT_ID));
   expect(state).toEqual({ status: 'error', reason: 'auth' });
   expect(mockedUpdateTag).not.toHaveBeenCalled();
 });

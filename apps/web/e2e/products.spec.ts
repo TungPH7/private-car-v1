@@ -1,27 +1,45 @@
 import { expect, test } from '@playwright/test';
 
-// E2E CÓ BACKEND (MSW-in-server, folder 24) — chứng minh render ASYNC Server Component của DAL, điều
-// unit/integration KHÔNG phủ được (async RSC chỉ E2E cover). Data đến từ store MSW chạy TRONG process
-// Next → toàn bộ đường BFF server-first (DAL `use cache` → http client → "backend") thực thi thật.
-test.describe('products (backend mock qua MSW-in-server)', () => {
-  test('render danh sách sản phẩm fetch phía SERVER', async ({ page }) => {
-    await page.goto('/en/products');
-    await expect(page.getByRole('heading', { level: 1, name: 'Products' })).toBeVisible();
+import { adminCredentials, createProducts, NO_ADMIN, runId } from './support/api';
 
-    // Tên sản phẩm đến từ store MSW → DAL (`getProducts`, `use cache`) đã fetch "backend" ở SERVER rồi
-    // ProductResults (async RSC) render + stream vào. `E2E Widget`/`E2E Gadget` KHÔNG bị test xoá đụng.
-    await expect(page.getByText('E2E Widget')).toBeVisible();
-    await expect(page.getByText('E2E Gadget')).toBeVisible();
+// Products of the real Java API, rendered on the server (PCAR-5): the test makes its own products
+// with a run id in their names, and opens the list filtered by that id.
+test.describe('products (the Java API, rendered on the server)', () => {
+  const admin = adminCredentials();
+  const run = runId();
+  let remove: (() => Promise<void>) | undefined;
 
-    // Giá format VND deterministic (model thuần, không Intl): 199000 → "199.000 ₫".
-    await expect(page.getByText('199.000 ₫')).toBeVisible();
+  test.beforeAll(async () => {
+    if (!admin) return;
+    ({ remove } = await createProducts(admin, [
+      { name: `E2E Widget ${run}`, slug: `e2e-widget-${run}`, price: 19.9 },
+      { name: `E2E Gadget ${run}`, slug: `e2e-gadget-${run}`, price: 5 },
+    ]));
   });
 
-  test('badge đếm sản phẩm: client → Route Handler /api → DAL', async ({ page }) => {
+  test.afterAll(async () => {
+    await remove?.();
+  });
+
+  test('lists the products of the API with their prices in the locale', async ({ page }) => {
+    test.skip(!admin, NO_ADMIN); // reason: the test makes its data as the admin of the API, unknown on some environments
+    await page.goto(`/en/products?name=${run}`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Products' })).toBeVisible();
+    await expect(page.getByText(`E2E Widget ${run}`)).toBeVisible();
+    await expect(page.getByText(`E2E Gadget ${run}`)).toBeVisible();
+    await expect(page.getByText('$19.90')).toBeVisible();
+  });
+
+  test('sorts by name through the filter form', async ({ page }) => {
+    test.skip(!admin, NO_ADMIN); // reason: the test makes its data as the admin of the API, unknown on some environments
+    await page.goto(`/en/products?name=${run}&sortBy=name&orderBy=asc`);
+    const names = page.locator('li').filter({ hasText: run });
+    await expect(names.first()).toContainText(`E2E Gadget ${run}`);
+    await expect(names.nth(1)).toContainText(`E2E Widget ${run}`);
+  });
+
+  test('the count badge: client → Route Handler /api → DAL → the API', async ({ page }) => {
     await page.goto('/en/products');
-    // ProductCountBadge dùng TanStack Query (client) gọi `/api/products/count` → Route Handler → DAL →
-    // MSW. Chứng minh đường BFF phía CLIENT (khác first-load do RSC lo). Không pin số CHÍNH XÁC vì store
-    // dùng chung server có thể đã bớt 1 do test xoá — chỉ cần badge hiện "Total products: <số>".
     await expect(page.getByText(/Total products:\s*\d+/)).toBeVisible();
   });
 });

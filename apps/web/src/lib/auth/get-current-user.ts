@@ -7,13 +7,14 @@ import { getSession } from '~/lib/auth/session';
 
 /** Định danh phiên tối thiểu cho re-authorization (Server Action) + authz thô theo role. */
 export interface SessionUser {
-  id: number;
+  /** The account UUID of the Java API. */
+  id: string;
   role: string;
 }
 
-/** Claims ta CẦN từ access token backend (NestJS): userId + roleName + hạn (giây). */
+/** Claims we need from the access token of the Java API (PCAR-4): userId, roleName, expiry (s). */
 const accessClaimsSchema = z.object({
-  userId: z.number(),
+  userId: z.string().min(1),
   roleName: z.string(),
   exp: z.number().optional(),
 });

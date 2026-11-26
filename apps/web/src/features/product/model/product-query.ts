@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 /**
- * ⭐ Contract QUERY danh sách sản phẩm — schema DÙNG CHUNG client↔server (đầu folder 13).
+ * ⭐ QUERY contract of the product list — a schema SHARED by client and server (folder 13).
  *
- * Mirror SUBSET query của backend public `GET /products` (đọc SOURCE thật, KHÔNG đoán —
- * `Nestjs-Super/ecom/src/routes/product/product.model.ts` → `GetProductsQuerySchema`):
- * `page` / `name` / `sortBy` / `orderBy`. (`limit` cố định trong DAL; brand/category/price filter để
- * dành — giữ demo gọn.) enum khớp ĐÚNG hằng backend (`OrderBy` asc|desc, `SortBy` createdAt|price|sale).
+ * The URL of the page keeps `page` (from 1) / `name` / `sortBy` / `orderBy`;
+ * `productQueryToApiParams` turns it into the query of `GET /api/products` of the Java API
+ * (`page` from 0, `size`, `sort=<property>,<direction>`, `name`). The sort list is the one the API
+ * accepts (`ProductService.SORTABLE`: name, price, createdAt); another property is a 400 there.
  *
  * Hai nguyên tắc validate (folder 13):
  *  1. **Schema = nguồn-sự-thật** → type suy ra bằng `z.infer` (KHÔNG khai trùng).
@@ -14,7 +14,7 @@ import { z } from 'zod';
  *     dưới dạng **CODE ổn định** (vd `min(2, { error: 'too_short' })`) để UI map sang i18n bằng
  *     `t('Validation.<code>')` (quyết định folder 13 — nhất quán `reason` codes folder 12).
  */
-export const PRODUCT_SORT_BY = ['createdAt', 'price', 'sale'] as const;
+export const PRODUCT_SORT_BY = ['createdAt', 'price', 'name'] as const;
 export const PRODUCT_ORDER_BY = ['asc', 'desc'] as const;
 
 export type ProductSortBy = (typeof PRODUCT_SORT_BY)[number];
@@ -53,5 +53,22 @@ export function productQueryToParams(query: ProductListQuery): Record<string, st
   if (query.name) params.name = query.name;
   if (query.sortBy !== 'createdAt') params.sortBy = query.sortBy;
   if (query.orderBy !== 'desc') params.orderBy = query.orderBy;
+  return params;
+}
+
+/**
+ * `ProductListQuery` → the query of `GET /api/products`: the 1-based page of the UI becomes the
+ * 0-based `page` of the API, `sortBy` + `orderBy` become one `sort=<property>,<direction>`. Pure.
+ */
+export function productQueryToApiParams(
+  query: ProductListQuery,
+  pageSize: number,
+): URLSearchParams {
+  const params = new URLSearchParams({
+    page: String(query.page - 1),
+    size: String(pageSize),
+    sort: `${query.sortBy},${query.orderBy}`,
+  });
+  if (query.name) params.set('name', query.name);
   return params;
 }

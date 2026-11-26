@@ -10,7 +10,7 @@ const labels = {
   sort: 'Sort',
   order: 'Order',
   apply: 'Apply',
-  sortOptions: { createdAt: 'Newest', price: 'Price', sale: 'On sale' },
+  sortOptions: { createdAt: 'Newest', price: 'Price', name: 'Name' },
   orderOptions: { asc: 'Asc', desc: 'Desc' },
 };
 const current = { page: 1, sortBy: 'createdAt', orderBy: 'desc' } as const;

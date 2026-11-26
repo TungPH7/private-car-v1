@@ -5,29 +5,42 @@ import { z } from 'zod';
  * re-validate). Khớp `UpdateMeBodySchema` backend (`{ name, phoneNumber, avatar }`). Phát CODE trung tính
  * (`{ error: 'code' }`) → UI map `t('Validation.<code>')` (kỷ luật folder 13).
  */
+/** Same rule as `UpdateProfileRequest.phoneNumber` of the Java API: digits and separators, optional +. */
+const PHONE_PATTERN = /^\+?[0-9 ().-]{6,31}$/;
+/** The Java API accepts only https avatars (no javascript:, data: or plain http). */
+const AVATAR_PROTOCOL = 'https:';
+/** BCrypt of the API reads 72 bytes at most; it asks for 8 characters at least. */
+const NEW_PASSWORD_MIN_LENGTH = 8;
+const NEW_PASSWORD_MAX_LENGTH = 72;
+
 export const updateProfileSchema = z.object({
   name: z.string().min(1, { error: 'required' }).max(100, { error: 'too_long' }),
-  // Backend: 9–15 ký tự HOẶC rỗng. Dùng `.refine` (1 code sạch) thay union (union làm rối code lỗi).
-  phoneNumber: z
+  // Empty, or the phone rule of the API. `.refine` gives one clean code (a union muddles codes).
+  phoneNumber: z.string().refine((v) => v === '' || PHONE_PATTERN.test(v), {
+    error: 'invalid_phone',
+  }),
+  // Empty, or an https URL. `URL.canParse` exists in Node 24 and browsers.
+  avatar: z
     .string()
-    .refine((v) => v === '' || (v.length >= 9 && v.length <= 15), { error: 'invalid_phone' }),
-  // Backend `avatar` nullable string; form cho URL hoặc rỗng. `URL.canParse` có ở Node 24 + browser.
-  avatar: z.string().refine((v) => v === '' || URL.canParse(v), { error: 'invalid_url' }),
+    .refine((v) => v === '' || (URL.canParse(v) && new URL(v).protocol === AVATAR_PROTOCOL), {
+      error: 'invalid_url',
+    }),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
 /**
- * Response `PUT /profile` = user (không password/totp). Validate ở biên kiểu **tối thiểu** (chỉ cần
- * xác nhận cập nhật thành công) — folder 11.
+ * Response of `PUT /api/users/me` = the profile. Validated **minimally** at the boundary: it only
+ * confirms the update (folder 11).
  */
 export const updateProfileResSchema = z.object({
-  id: z.number(),
+  id: z.string(),
   name: z.string(),
 });
 
 /**
- * Đổi mật khẩu — khớp `ChangePasswordBodySchema` backend (`{ password, newPassword 6–100,
- * confirmNewPassword }` + superRefine `newPassword === confirmNewPassword`).
+ * Password change — the DAL sends `{ currentPassword: password, newPassword }` to
+ * `PUT /api/users/me/password` (new password 8–72 characters); `confirmNewPassword` stays in the
+ * form (superRefine `newPassword === confirmNewPassword`).
  *
  * ⭐ `superRefine` = validate LIÊN-TRƯỜNG (cross-field): zodResolver chạy nó Ở CLIENT → lệch confirm
  * hiện lỗi TỨC THÌ (bài học chính của Stage B; field-level rule thường không bắt được quan-hệ-2-field).
@@ -36,7 +49,10 @@ export const updateProfileResSchema = z.object({
 export const changePasswordSchema = z
   .object({
     password: z.string().min(1, { error: 'required' }),
-    newPassword: z.string().min(6, { error: 'password_too_short' }).max(100, { error: 'too_long' }),
+    newPassword: z
+      .string()
+      .min(NEW_PASSWORD_MIN_LENGTH, { error: 'password_too_short' })
+      .max(NEW_PASSWORD_MAX_LENGTH, { error: 'too_long' }),
     confirmNewPassword: z.string().min(1, { error: 'required' }),
   })
   .superRefine((data, ctx) => {

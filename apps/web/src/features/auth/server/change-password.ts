@@ -1,17 +1,17 @@
 import 'server-only';
 
-import { messageResponseSchema } from '~/features/auth/model/auth';
 import { type ChangePasswordInput } from '~/features/auth/model/profile-form';
+import { AUTH_ENDPOINTS } from '~/lib/auth/api-endpoints';
 import { authHeaders } from '~/lib/auth/auth-headers';
-import { httpPut } from '~/lib/http/client';
+import { httpSendNoContent } from '~/lib/http/client';
 
 /**
- * DAL đổi mật khẩu (BFF) — `PUT /profile/change-password` (`@ApiBearerAuth`): backend kiểm mật khẩu
- * hiện tại (`password`) + đặt `newPassword`. `server-only`. Bearer qua `authHeaders()`. Trả `{ message }`.
+ * Password change DAL (BFF) — `PUT /api/users/me/password` (Bearer) → 204. The API checks the
+ * current password and revokes every refresh token of the account. `server-only`.
  */
-export async function changePassword(input: ChangePasswordInput): Promise<{ message: string }> {
-  return httpPut('/profile/change-password', messageResponseSchema, {
+export async function changePassword(input: ChangePasswordInput): Promise<void> {
+  await httpSendNoContent('PUT', AUTH_ENDPOINTS.password, {
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ currentPassword: input.password, newPassword: input.newPassword }),
   });
 }

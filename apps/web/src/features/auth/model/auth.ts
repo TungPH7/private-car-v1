@@ -18,21 +18,13 @@ export const loginInputSchema = z.object({
 export type LoginInput = z.infer<typeof loginInputSchema>;
 
 /**
- * Response `POST /auth/login` (= `LoginResSchema` backend): 2 JWT do NestJS ký. Validate ở biên
- * (folder 11) → kiểu chắc chắn trước khi niêm phong vào cookie.
+ * Response of `POST /api/auth/tokens` (password grant) of the Java API: a JWT access token and a
+ * refresh token. Validated at the boundary (folder 11) before it is sealed into the cookie;
+ * `tokenType` and `expiresIn` are dropped (the access token carries its own `exp`).
  */
 export const loginResponseSchema = z.object({
   accessToken: z.string().min(1),
   refreshToken: z.string().min(1),
-});
-
-/**
- * Envelope `{ message }` của backend (logout trả `MessageResSchema`). Định nghĩa FEATURE-LOCAL
- * (không import từ feature `product`) — mỗi feature validate biên của riêng nó (cô lập feature,
- * folder 06/11); trùng shape với product là tình cờ, KHÔNG phải để dùng chung.
- */
-export const messageResponseSchema = z.object({
-  message: z.string(),
 });
 
 /** Lý do đăng nhập thất bại — đủ để client map i18n, KHÔNG lộ field nào sai (chống dò tài khoản). */

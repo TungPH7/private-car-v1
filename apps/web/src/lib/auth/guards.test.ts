@@ -15,25 +15,23 @@ vi.mock('~/i18n/navigation', () => ({
 vi.mock('next-intl/server', () => ({ getLocale: vi.fn().mockResolvedValue('en') }));
 
 const ADMIN = {
-  id: 1,
+  id: '0193c1f4-7b9a-7a3c-8d2e-aa1c98dead10',
   email: 'a@b.com',
   name: 'A',
   phoneNumber: '',
   avatar: null,
   role: {
     name: 'ADMIN',
-    permissions: [
-      { module: 'MANAGE-PRODUCT', path: '/manage-product/products/:productId', method: 'DELETE' },
-    ],
+    permissions: [{ module: 'product', path: '/api/products/{id}', method: 'DELETE' }],
   },
 };
 const CLIENT = {
-  id: 2,
+  id: '0193c1f4-7b9a-7a3c-8d2e-aa1c98dead11',
   email: 'c@b.com',
   name: 'C',
   phoneNumber: '',
   avatar: null,
-  role: { name: 'CLIENT', permissions: [{ module: 'PROFILE', path: '/profile', method: 'GET' }] },
+  role: { name: 'CUSTOMER', permissions: [] },
 };
 
 test('requireUser: chưa đăng nhập → redirect /login', async () => {
@@ -49,11 +47,11 @@ test('requireUser: đã đăng nhập → trả user', async () => {
 
 test('requireModule: thiếu module → redirect /forbidden', async () => {
   vi.mocked(getProfile).mockResolvedValue(CLIENT);
-  await expect(requireModule('MANAGE-PRODUCT')).rejects.toThrow('REDIRECT');
+  await expect(requireModule('product')).rejects.toThrow('REDIRECT');
   expect(vi.mocked(redirect)).toHaveBeenCalledWith({ href: '/forbidden', locale: 'en' });
 });
 
 test('requireModule: có module → trả user', async () => {
   vi.mocked(getProfile).mockResolvedValue(ADMIN);
-  await expect(requireModule('MANAGE-PRODUCT')).resolves.toEqual(ADMIN);
+  await expect(requireModule('product')).resolves.toEqual(ADMIN);
 });

@@ -38,6 +38,14 @@ apps:
       development: private-car-v1-dev.ao.t2g.io.vn
       staging: private-car-v1-staging.ao.t2g.io.vn
       production: private-car-v1.ao.t2g.io.vn
+    # The coverage.exclude of apps/web/vitest.config.ts (test files and .d.ts aside, which the kit leaves out): the
+    # test harness, and the route shells, boot and middleware that the E2E covers.
+    coverage_exclude:
+      - src/testing/**
+      - src/app/*locale*/**
+      - src/app/*.{ts,tsx}
+      - src/instrumentation.ts
+      - src/proxy.ts
   admin:
     repo: private-car-v1
     path: apps/admin
