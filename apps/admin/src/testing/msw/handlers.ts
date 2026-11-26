@@ -1,41 +1,43 @@
 import { http, HttpResponse } from 'msw';
 
-// Default happy-path API handlers. Wildcard origins (`*/path`) match regardless
-// of the configured base URL. Shapes match the Zod models (folders 07/10) so the
-// api layer's boundary validation passes. Tests override per-case via
-// `server.use(...)`.
+import {
+  ADMIN_PROFILE,
+  apiPage,
+  apiProduct,
+  apiTokenPair,
+  GADGET_ID,
+  WIDGET_ID,
+} from '@/testing/api-fixtures';
+
+// Default happy-path API handlers, in the shape the Java API sends (`apps/api`, PCAR-4), so the
+// api layer's boundary validation runs against the real contract. Wildcard origins (`*/path`)
+// match regardless of the configured base URL. Tests override per-case via `server.use(...)`.
+const PRODUCTS = [
+  apiProduct({ id: WIDGET_ID, name: 'Test Widget', slug: 'test-widget', price: 19.99 }),
+  apiProduct({ id: GADGET_ID, name: 'Test Gadget', slug: 'test-gadget', price: 45 }),
+];
+
 export const handlers = [
-  http.get('*/products', () =>
-    HttpResponse.json([
-      { id: 'p-001', name: 'Test Widget', priceCents: 1999, inStock: true },
-      { id: 'p-002', name: 'Test Gadget', priceCents: 4500, inStock: false },
-    ]),
-  ),
+  // GET /products?name=… filters by name, ignoring case, as the API does.
+  http.get('*/products', ({ request }) => {
+    const name = new URL(request.url).searchParams.get('name')?.toLowerCase() ?? '';
+    return HttpResponse.json(
+      apiPage(PRODUCTS.filter((product) => product.name.toLowerCase().includes(name))),
+    );
+  }),
   http.get('*/products/:id', ({ params }) =>
-    HttpResponse.json({
-      id: String(params['id']),
-      name: 'Test Widget',
-      priceCents: 1999,
-      inStock: true,
-    }),
+    HttpResponse.json(apiProduct({ id: String(params['id']), name: 'Test Widget' })),
   ),
-  http.get('*/profile', () =>
-    HttpResponse.json({
-      id: 1,
-      email: 'test@example.com',
-      name: 'Tester',
-      role: { id: 1, name: 'admin', permissions: [] },
-    }),
-  ),
-  http.post('*/auth/login', () =>
-    HttpResponse.json({ accessToken: 'test-access', refreshToken: 'test-refresh' }),
-  ),
-  http.post('*/products', () =>
-    HttpResponse.json({ id: 'p-new', name: 'Created Widget', priceCents: 500, inStock: true }),
-  ),
+  http.get('*/users/me', () => HttpResponse.json(ADMIN_PROFILE)),
+  http.post('*/auth/tokens', () => HttpResponse.json(apiTokenPair('test-access', 'test-refresh'))),
+  http.post('*/auth/revocations', () => new HttpResponse(null, { status: 204 })),
+  http.post('*/products', async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(apiProduct({ id: 'created-id', ...body }), { status: 201 });
+  }),
   http.put('*/products/:id', async ({ params, request }) => {
     const body = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: String(params['id']), ...body });
+    return HttpResponse.json(apiProduct({ id: String(params['id']), ...body }));
   }),
   http.delete('*/products/:id', () => new HttpResponse(null, { status: 204 })),
 ];

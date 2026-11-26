@@ -7,12 +7,17 @@ import {
   type LoginCredentials,
 } from '@/features/auth/model/auth';
 import { api } from '@/lib/api/api';
+import { API_ENDPOINTS, GRANT_TYPE } from '@/lib/api/endpoints';
 import { setTokens } from '@/lib/auth/token-storage';
 
-// POST /auth/login → tokens only (no user). The user arrives via GET /profile,
+// POST /auth/tokens (password grant) → tokens only (no user). The user arrives via GET /users/me,
 // which the profile query refetches once tokens are stored.
 export function login(credentials: LoginCredentials): Promise<AuthTokens> {
-  return api.post('/auth/login', credentials, { schema: authTokensSchema });
+  return api.post(
+    API_ENDPOINTS.tokens,
+    { grantType: GRANT_TYPE.password, ...credentials },
+    { schema: authTokensSchema },
+  );
 }
 
 export function useLogin() {

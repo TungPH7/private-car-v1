@@ -5,7 +5,7 @@ import { type Permission } from '@/features/auth/model/auth';
 import { hasModule, hasPermission } from './permission';
 
 const permissions: Permission[] = [
-  { id: 1, name: 'list products', path: '/products', method: 'GET', module: 'product' },
+  { name: 'list products', path: '/products', method: 'GET', module: 'product' },
 ];
 
 // Pure-unit smoke test: proves Vitest runs framework-free unit tests (no DOM).

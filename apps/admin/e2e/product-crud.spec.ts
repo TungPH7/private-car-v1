@@ -1,121 +1,47 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Full Product CRUD end-to-end against an in-spec STATEFUL mock (Playwright
-// page.route) — no backend, no UI lib. Proves the whole Phase-1.1 stack works
-// together: routing, RBAC gating, TanStack Query cache invalidation, RHF forms,
-// error handling. (Alternative: an MSW browser worker sharing the unit handlers —
-// page.route is chosen here to keep the spec self-contained and the 88 unit tests
-// untouched.)
+import { adminCredentials, type AdminCredentials, NO_ADMIN, runId } from './support/admin-account';
 
-interface MockProduct {
-  id: string;
-  name: string;
-  priceCents: number;
-  inStock: boolean;
+// Full product CRUD end to end on the REAL Java API (PCAR-6): the Playwright config of the kit
+// starts web, admin, api and Postgres, and the admin dev server proxies /api to the API. The test
+// signs in with the admin account of the API and goes through the UI only: RBAC (module and
+// permissions of GET /users/me), forms with the rules of the API, TanStack Query invalidation.
+// Its product carries a run id in its name and slug, so parallel runs never meet.
+
+async function signIn(page: Page, admin: AdminCredentials): Promise<void> {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(admin.email);
+  await page.getByLabel('Password').fill(admin.password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/$/); // LoginForm navigates home on success.
 }
 
-// A profile whose permissions unlock the admin module + product write actions, so
-// RequireModule and the <Can> guards let the CRUD UI render.
-const ADMIN_PROFILE = {
-  id: 1,
-  email: 'admin@example.com',
-  name: 'Admin',
-  role: {
-    id: 1,
-    name: 'admin',
-    permissions: [
-      { id: 1, name: 'update-product', path: '/products', method: 'PUT', module: 'role' },
-      { id: 2, name: 'delete-product', path: '/products', method: 'DELETE', module: 'role' },
-    ],
-  },
-};
+test('Product CRUD end-to-end on the API (create → read → update → delete)', async ({ page }) => {
+  const admin = adminCredentials();
+  test.skip(!admin, NO_ADMIN); // reason: the test signs in as the admin of the API, unknown on some environments
+  if (!admin) return;
+  const run = runId();
+  const name = `E2E Gadget ${run}`;
 
-async function setupMockedApp(page: Page, initial: MockProduct[]): Promise<void> {
-  const products = [...initial];
+  await signIn(page, admin);
 
-  // Mock ONLY the backend: the app calls the API on /api of its own origin
-  // (VITE_API_URL, default /api), on whatever port the run gives it. Anchored to
-  // /api so these routes do NOT intercept SPA navigations — page.goto('/products')
-  // is a document request to the dev server, not an API call.
-  const profileRe = /^https?:\/\/[^/]+\/api\/profile(\?.*)?$/;
-  const productsRe = /^https?:\/\/[^/]+\/api\/products(\?.*)?$/;
-  const productItemRe = /^https?:\/\/[^/]+\/api\/products\/[^/?]+$/;
-
-  // Seed the auth tokens BEFORE the app loads (string content → no DOM types
-  // needed in this Node-typed spec). Keys match src/lib/auth/token-storage.ts.
-  await page.addInitScript({
-    content:
-      "localStorage.setItem('tungph7.auth.access','e2e-access');localStorage.setItem('tungph7.auth.refresh','e2e-refresh');",
-  });
-
-  await page.route(profileRe, (route) => route.fulfill({ json: ADMIN_PROFILE }));
-
-  // Collection: GET list + POST create.
-  await page.route(productsRe, async (route) => {
-    const method = route.request().method();
-    if (method === 'GET') {
-      await route.fulfill({ json: products });
-      return;
-    }
-    if (method === 'POST') {
-      const body = route.request().postDataJSON() as Omit<MockProduct, 'id'>;
-      const created: MockProduct = { ...body, id: `p-${products.length + 1}` };
-      products.push(created);
-      await route.fulfill({ json: created });
-      return;
-    }
-    await route.continue();
-  });
-
-  // Item: GET detail + PUT update + DELETE.
-  await page.route(productItemRe, async (route) => {
-    const method = route.request().method();
-    const id = route.request().url().split('/products/')[1]!.split('?')[0]!;
-    const index = products.findIndex((product) => product.id === id);
-    if (method === 'GET') {
-      const found = products[index];
-      await (found
-        ? route.fulfill({ json: found })
-        : route.fulfill({ status: 404, json: { message: 'Not found' } }));
-      return;
-    }
-    if (method === 'PUT') {
-      const body = route.request().postDataJSON() as Omit<MockProduct, 'id'>;
-      const updated: MockProduct = { ...body, id };
-      if (index >= 0) products[index] = updated;
-      await route.fulfill({ json: updated });
-      return;
-    }
-    if (method === 'DELETE') {
-      if (index >= 0) products.splice(index, 1);
-      await route.fulfill({ status: 204, body: '' });
-      return;
-    }
-    await route.continue();
-  });
-}
-
-test('Product CRUD end-to-end (create → read → update → delete)', async ({ page }) => {
-  await setupMockedApp(page, [
-    { id: 'p-001', name: 'Seed Widget', priceCents: 1999, inStock: true },
-  ]);
-
-  // CREATE — through the RBAC-gated admin form.
+  // CREATE — through the RBAC-gated admin form (module product).
   await page.goto('/admin');
-  await page.getByLabel('Name').fill('E2E Gadget');
-  await page.getByLabel('Price (cents)').fill('2500');
+  await page.getByLabel('Name').fill(name);
+  await page.getByLabel('Slug').fill(`e2e-gadget-${run}`);
+  await page.getByLabel('Price (USD)').fill('25');
   await page.getByRole('button', { name: 'Create product' }).click();
   await expect(page.getByText('Product created.')).toBeVisible();
 
-  // READ — it shows up in the list.
-  await page.goto('/products');
-  await expect(page.getByRole('link', { name: 'E2E Gadget' })).toBeVisible();
+  // READ — the API finds it by name.
+  await page.goto(`/products?q=${run}`);
+  await expect(page.getByRole('link', { name })).toBeVisible();
 
-  // UPDATE — open detail, edit the price, see the new value.
-  await page.getByRole('link', { name: 'E2E Gadget' }).click();
-  await expect(page).toHaveURL(/\/products\/p-2$/);
+  // UPDATE — open the detail, edit the price, see the new value.
+  await page.getByRole('link', { name }).click();
+  await expect(page.getByText('Price: $25.00')).toBeVisible();
   await page.getByRole('link', { name: 'Edit' }).click();
-  await page.getByLabel('Price (cents)').fill('9999');
+  await page.getByLabel('Price (USD)').fill('99.99');
   await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByText('Price: $99.99')).toBeVisible();
 
@@ -123,5 +49,12 @@ test('Product CRUD end-to-end (create → read → update → delete)', async ({
   await page.getByRole('button', { name: 'Delete' }).click();
   await page.getByRole('button', { name: 'Yes, delete' }).click();
   await expect(page).toHaveURL(/\/products$/);
-  await expect(page.getByRole('link', { name: 'E2E Gadget' })).toHaveCount(0);
+  await page.goto(`/products?q=${run}`);
+  await expect(page.getByText('No products yet.')).toBeVisible();
+  await expect(page.getByRole('link', { name })).toHaveCount(0);
+});
+
+test('a signed-out visitor is sent to sign in from the admin page', async ({ page }) => {
+  await page.goto('/admin');
+  await expect(page).toHaveURL(/\/login/);
 });

@@ -4,5 +4,11 @@
   "count_one": "{{count}} product",
   "count_other": "{{count}} products",
   "empty": "No products yet.",
-  "create": "Create product"
+  "create": "Create product",
+  "fieldName": "Name",
+  "fieldSlug": "Slug",
+  "fieldPrice": "Price (USD)",
+  "fieldDescription": "Description",
+  "price": "Price: {{price}}",
+  "slug": "Slug: {{slug}}"
 }

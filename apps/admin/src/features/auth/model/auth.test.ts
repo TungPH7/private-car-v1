@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { ADMIN_PROFILE } from '@/testing/api-fixtures';
+
 import { httpMethodSchema, loginCredentialsSchema, permissionSchema, userSchema } from './auth';
 
 describe('auth model schemas', () => {
@@ -20,24 +22,16 @@ describe('auth model schemas', () => {
     expect(httpMethodSchema.safeParse('FETCH').success).toBe(false);
   });
 
-  it('permissionSchema requires a numeric id', () => {
-    const base = { name: 'p', path: '/x', method: 'GET', module: 'm' };
-    expect(permissionSchema.safeParse({ id: 1, ...base }).success).toBe(true);
-    expect(permissionSchema.safeParse({ id: '1', ...base }).success).toBe(false);
+  it('permissionSchema needs a known method and keeps name, path and module', () => {
+    const permission = { name: 'product:delete', path: '/api/products/{id}', module: 'product' };
+    expect(permissionSchema.safeParse({ ...permission, method: 'DELETE' }).success).toBe(true);
+    expect(permissionSchema.safeParse({ ...permission, method: 'FETCH' }).success).toBe(false);
   });
 
-  it('userSchema validates the nested role + permissions', () => {
-    const user = {
-      id: 1,
-      email: 'a@b.com',
-      name: 'Tester',
-      role: {
-        id: 1,
-        name: 'admin',
-        permissions: [{ id: 1, name: 'p', path: '/x', method: 'GET', module: 'm' }],
-      },
-    };
-    expect(userSchema.safeParse(user).success).toBe(true);
-    expect(userSchema.safeParse({ ...user, role: undefined }).success).toBe(false);
+  it('userSchema reads GET /users/me of the API (UUID id, role, permissions)', () => {
+    expect(userSchema.safeParse(ADMIN_PROFILE).success).toBe(true);
+    expect(userSchema.parse(ADMIN_PROFILE).id).toBe(ADMIN_PROFILE.id);
+    expect(userSchema.safeParse({ ...ADMIN_PROFILE, id: 1 }).success).toBe(false);
+    expect(userSchema.safeParse({ ...ADMIN_PROFILE, role: undefined }).success).toBe(false);
   });
 });

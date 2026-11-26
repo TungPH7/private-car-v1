@@ -1,10 +1,12 @@
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 
 import { paths } from '@/config/paths';
 import { useProduct } from '@/features/product/api/get-product';
-import { formatPriceFromCents } from '@/features/product/model/product';
+import { formatPrice } from '@/features/product/model/product';
 import { isApiError } from '@/lib/api/api-error';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { invariant } from '@/utils/assert';
 
 interface ProductDetailProps {
@@ -14,6 +16,8 @@ interface ProductDetailProps {
 }
 
 export function ProductDetail({ actions }: ProductDetailProps) {
+  const { t } = useTranslation('product');
+  const { locale } = useLocale();
   const { productId } = useParams();
   invariant(productId, 'productId route param is required');
 
@@ -36,8 +40,9 @@ export function ProductDetail({ actions }: ProductDetailProps) {
   return (
     <section>
       <h2>{product.name}</h2>
-      <p>Price: ${formatPriceFromCents(product.priceCents)}</p>
-      <p>Status: {product.inStock ? 'In stock' : 'Out of stock'}</p>
+      <p>{t('price', { price: formatPrice(product.price, locale) })}</p>
+      <p>{t('slug', { slug: product.slug })}</p>
+      {product.description !== null ? <p>{product.description}</p> : null}
       {actions ? <p>{actions}</p> : null}
       <Link to={paths.products.getHref()}>Back to products</Link>
     </section>

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Auth + RBAC models. Zod is the single source of truth (validated at the API
 // boundary); the rest of the app depends on THESE types, not the transport. The
-// shapes mirror the current backend contract but are isolated here — swapping
+// shapes mirror the contract of the Java API (`apps/api`, PCAR-4) but are isolated here — swapping
 // backends means editing this file + the api calls, nothing downstream.
 
 export const httpMethodSchema = z.enum([
@@ -20,7 +20,6 @@ export type HttpMethod = z.infer<typeof httpMethodSchema>;
 // (route-level guard) or by method+path (element-level guard). Permissions come
 // from the backend — never hardcoded on the frontend.
 export const permissionSchema = z.object({
-  id: z.number(),
   name: z.string(),
   path: z.string(),
   method: httpMethodSchema,
@@ -29,15 +28,15 @@ export const permissionSchema = z.object({
 export type Permission = z.infer<typeof permissionSchema>;
 
 export const roleSchema = z.object({
-  id: z.number(),
   name: z.string(),
   permissions: z.array(permissionSchema),
 });
 export type Role = z.infer<typeof roleSchema>;
 
-// The authenticated user (from GET /profile). `role.permissions` drives RBAC.
+// The authenticated user (from GET /users/me). `role.permissions` drives RBAC.
 export const userSchema = z.object({
-  id: z.number(),
+  /** The account UUID of the API. */
+  id: z.string().min(1),
   email: z.email(),
   name: z.string(),
   role: roleSchema,

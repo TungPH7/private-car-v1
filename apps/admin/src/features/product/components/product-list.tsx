@@ -7,8 +7,9 @@ import { paths } from '@/config/paths';
 import { prefetchProduct } from '@/features/product/api/get-product';
 import { useProducts } from '@/features/product/api/get-products';
 import { useProductFilters } from '@/features/product/hooks/use-product-filters';
-import { formatPriceFromCents } from '@/features/product/model/product';
+import { formatPrice } from '@/features/product/model/product';
 import { isApiError } from '@/lib/api/api-error';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 // UI-agnostic (Phase 1.1): plain markup only. Server data comes from TanStack
 // Query (folder 08); the search term is URL state via nuqs (folder 09). Strings
@@ -16,19 +17,16 @@ import { isApiError } from '@/lib/api/api-error';
 // i18next pluralization (`count_one`/`count_other`).
 export function ProductList() {
   const { t } = useTranslation('product');
+  const { locale } = useLocale();
   const queryClient = useQueryClient();
   const { search, setSearch } = useProductFilters();
-  // Filter against the DEFERRED term so the input stays responsive on large
-  // lists: typing updates instantly while the (potentially expensive) filter
-  // catches up at lower priority. Pairs with <VirtualList> for big result sets.
-  // (Vercel rerender-use-deferred-value.)
+  // Query with the DEFERRED term so the input stays responsive: typing updates
+  // instantly while the request for the new term follows at lower priority.
+  // (Vercel rerender-use-deferred-value.) The API filters by name over every
+  // product; the list keeps the previous result on screen while it loads.
   const deferredSearch = useDeferredValue(search);
-  const { data: products, isPending, isError, error } = useProducts();
-
-  // Client-side filter once data is present (case-insensitive name match).
-  const filtered = products?.filter((product) =>
-    product.name.toLowerCase().includes(deferredSearch.toLowerCase()),
-  );
+  const { data: page, isPending, isError, error } = useProducts(deferredSearch);
+  const filtered = page?.content;
 
   return (
     <section>
@@ -53,7 +51,7 @@ export function ProductList() {
       {filtered ? (
         filtered.length > 0 ? (
           <>
-            <p>{t('count', { count: filtered.length })}</p>
+            <p>{t('count', { count: page?.page.totalElements ?? filtered.length })}</p>
             <ul>
               {filtered.map((product) => (
                 <li key={product.id}>
@@ -65,8 +63,7 @@ export function ProductList() {
                   >
                     {product.name}
                   </Link>{' '}
-                  — ${formatPriceFromCents(product.priceCents)}
-                  {product.inStock ? '' : ' (out of stock)'}
+                  — {formatPrice(product.price, locale)}
                 </li>
               ))}
             </ul>

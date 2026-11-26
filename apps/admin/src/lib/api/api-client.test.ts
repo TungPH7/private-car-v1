@@ -6,6 +6,8 @@ import { server } from '@/testing/msw/server';
 
 import { createApiClient } from './api-client';
 import { isApiError } from './api-error';
+import { configureApiAuth, resetApiAuth } from './auth-bridge';
+import { ACCESS_TOKEN_HEADER } from './endpoints';
 
 const BASE = 'http://localhost:3000';
 const api = createApiClient({ baseURL: BASE });
@@ -74,5 +76,42 @@ describe('createApiClient (integration via MSW)', () => {
     );
     await expect(api.post('/things', {})).rejects.toMatchObject({ kind: 'http', status: 500 });
     expect(calls).toBe(1); // no retry for POST
+  });
+});
+
+// Behind the basic auth of Development and Staging the browser sends `Authorization` for the
+// environment, so the access token goes in its own header, which the API reads (PCAR-4, PCAR-6).
+describe('createApiClient access token', () => {
+  afterEach(() => {
+    resetApiAuth();
+  });
+
+  function captureHeaders(): { headers: Headers | null } {
+    const seen: { headers: Headers | null } = { headers: null };
+    server.use(
+      http.get(`${BASE}/widget`, ({ request }) => {
+        seen.headers = request.headers;
+        return HttpResponse.json({ id: 'w1', name: 'Widget' });
+      }),
+    );
+    return seen;
+  }
+
+  it('sends the access token in X-Access-Token and leaves Authorization alone', async () => {
+    configureApiAuth({ getAccessToken: () => 'access-token' });
+    const seen = captureHeaders();
+
+    await api.get('/widget', { schema: widgetSchema });
+
+    expect(seen.headers?.get(ACCESS_TOKEN_HEADER)).toBe('access-token');
+    expect(seen.headers?.get('Authorization')).toBeNull();
+  });
+
+  it('sends no token header when signed out', async () => {
+    const seen = captureHeaders();
+
+    await api.get('/widget', { schema: widgetSchema });
+
+    expect(seen.headers?.has(ACCESS_TOKEN_HEADER)).toBe(false);
   });
 });

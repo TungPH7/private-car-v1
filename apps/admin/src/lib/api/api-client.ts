@@ -7,6 +7,7 @@ import { type ZodType } from 'zod';
 
 import { ApiError, normalizeError } from '@/lib/api/api-error';
 import { getApiAuth } from '@/lib/api/auth-bridge';
+import { ACCESS_TOKEN_HEADER } from '@/lib/api/endpoints';
 import { getRetryDelayMs, isRetryableError, MAX_RETRIES } from '@/lib/api/retry';
 
 // We stash per-request state on the Axios config so interceptors can track how
@@ -75,11 +76,13 @@ export function createApiClient(options: ApiClientOptions) {
     return refreshPromise;
   }
 
-  // --- Request interceptor: attach bearer token from the injected auth bridge.
+  // --- Request interceptor: attach the access token from the injected auth bridge.
+  // It goes in ACCESS_TOKEN_HEADER, not `Authorization`: behind the basic auth of Development and
+  // Staging the browser keeps `Authorization` for that, and the API reads either (PCAR-4).
   instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const token = getApiAuth().getAccessToken();
     if (token) {
-      config.headers.set('Authorization', `Bearer ${token}`);
+      config.headers.set(ACCESS_TOKEN_HEADER, token);
     }
     return config;
   });

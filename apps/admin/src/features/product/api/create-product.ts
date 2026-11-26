@@ -1,11 +1,17 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { productKeys } from '@/features/product/api/query-keys';
-import { type NewProduct, type Product, productSchema } from '@/features/product/model/product';
+import {
+  type Product,
+  type ProductInput,
+  productSchema,
+  toProductRequest,
+} from '@/features/product/model/product';
 import { api } from '@/lib/api/api';
+import { API_ENDPOINTS } from '@/lib/api/endpoints';
 
-export function createProduct(input: NewProduct): Promise<Product> {
-  return api.post('/products', input, { schema: productSchema });
+export function createProduct(input: ProductInput): Promise<Product> {
+  return api.post(API_ENDPOINTS.products, toProductRequest(input), { schema: productSchema });
 }
 
 // Mutation + cache invalidation: after a successful create, mark the product
