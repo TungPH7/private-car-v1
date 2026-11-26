@@ -11,8 +11,10 @@ import { parse } from 'yaml';
  *
  * - The API: `E2E_API_URL` when the kit tests an environment (`/ao-qa`), else localhost on the
  *   port of `.ai-orchestrator/project.yaml`, moved by `AO_PORT_OFFSET` in a lane.
- * - The admin account: `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD`, else the bootstrap admin of
- *   `apps/api/.env` (`APP_AUTH_BOOTSTRAP_ADMIN_*`), which the API creates at start.
+ * - The admin account, by where the tests run (round 2): on an environment (`E2E_BASE_URL`, as
+ *   under `/ao-qa`), `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD`, the admin of that environment; on
+ *   this machine, always the bootstrap admin of `apps/api/.env` (`APP_AUTH_BOOTSTRAP_ADMIN_*`),
+ *   which the API Playwright starts creates, even when `E2E_ADMIN_*` are set for `/ao-qa`.
  * - The token goes in `X-Access-Token`: on an environment, `Authorization` carries its basic auth.
  */
 
@@ -59,20 +61,43 @@ function readDotenv(file: string): Record<string, string> {
   return values;
 }
 
-/** The admin account the tests sign in with, or null when none is known. */
-export function adminCredentials(): AdminCredentials | null {
-  const fromEnv = { email: process.env.E2E_ADMIN_EMAIL, password: process.env.E2E_ADMIN_PASSWORD };
-  if (fromEnv.email && fromEnv.password)
-    return { email: fromEnv.email, password: fromEnv.password };
-  const dotenv = readDotenv(join(ROOT, 'apps', 'api', '.env'));
-  const email = dotenv.APP_AUTH_BOOTSTRAP_ADMIN_EMAIL;
-  const password = dotenv.APP_AUTH_BOOTSTRAP_ADMIN_PASSWORD;
+type Env = Readonly<Record<string, string | undefined>>;
+
+/** Whether the tests run on an environment (`/ao-qa` sets `E2E_BASE_URL`), not on this machine. */
+function onEnvironment(env: Env): boolean {
+  return Boolean(env.E2E_BASE_URL);
+}
+
+/**
+ * The admin account the tests sign in with, or null when none is known: on an environment, both
+ * `E2E_ADMIN_*`; on this machine, the bootstrap admin of `dotenv` (`apps/api/.env`) only, since
+ * `E2E_ADMIN_*` name the admin of an environment, whom the API started here does not know.
+ */
+export function adminCredentialsFrom(
+  env: Env,
+  dotenv: Readonly<Record<string, string>>,
+): AdminCredentials | null {
+  const [email, password] = onEnvironment(env)
+    ? [env.E2E_ADMIN_EMAIL, env.E2E_ADMIN_PASSWORD]
+    : [dotenv.APP_AUTH_BOOTSTRAP_ADMIN_EMAIL, dotenv.APP_AUTH_BOOTSTRAP_ADMIN_PASSWORD];
   return email && password ? { email, password } : null;
 }
 
+/** The admin account of this run, from the environment variables and `apps/api/.env`. */
+export function adminCredentials(): AdminCredentials | null {
+  const dotenv = onEnvironment(process.env) ? {} : readDotenv(join(ROOT, 'apps', 'api', '.env'));
+  return adminCredentialsFrom(process.env, dotenv);
+}
+
+/** Why a test that needs the admin account is skipped, naming what to set where the tests run. */
+export function noAdminReason(env: Env): string {
+  return onEnvironment(env)
+    ? 'No admin account: set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD to the admin of the environment under test'
+    : 'No admin account: set APP_AUTH_BOOTSTRAP_ADMIN_EMAIL and APP_AUTH_BOOTSTRAP_ADMIN_PASSWORD in apps/api/.env';
+}
+
 /** Why a test that needs the admin account is skipped, for `test.skip`. */
-export const NO_ADMIN =
-  'No admin account: set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD, or APP_AUTH_BOOTSTRAP_ADMIN_* in apps/api/.env';
+export const NO_ADMIN = noAdminReason(process.env);
 
 /** A request context for the API, with the basic auth of an environment when there is one. */
 async function apiContext(): Promise<APIRequestContext> {
