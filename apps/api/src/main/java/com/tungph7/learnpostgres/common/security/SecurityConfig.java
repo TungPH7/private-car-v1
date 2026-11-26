@@ -58,7 +58,13 @@ public class SecurityConfig {
             auth ->
                 auth
                     // === Probe & monitoring ===
-                    .requestMatchers("/actuator/health", "/actuator/info")
+                    // liveness: HEALTHCHECK của apps/api/Dockerfile. Chỉ đúng hai probe, không
+                    // /actuator/health/**, để các component khác (db, diskSpace...) vẫn đóng.
+                    .requestMatchers(
+                        "/actuator/health",
+                        "/actuator/health/liveness",
+                        "/actuator/health/readiness",
+                        "/actuator/info")
                     .permitAll()
 
                     // === API documentation ===
