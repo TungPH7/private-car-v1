@@ -9,7 +9,9 @@ Tất cả thay đổi đáng chú ý của bộ tài liệu coding convention �
 
 ## [Unreleased]
 
-_(Chưa có thay đổi chờ phát hành.)_
+**Added**
+
+- `16-testing.md` — **TE-021**: E2E đăng nhập bằng tài khoản admin của nơi nó chạy (admin bootstrap của `apps/api/.env` trên máy; `E2E_ADMIN_EMAIL`, `E2E_ADMIN_PASSWORD` trên môi trường, hai biến user mà qa cần) (PCAR-6).
 
 ---
 

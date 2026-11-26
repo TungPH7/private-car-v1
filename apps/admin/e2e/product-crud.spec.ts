@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { adminCredentials, type AdminCredentials, NO_ADMIN, runId } from './support/admin-account';
+import { adminAccount, type AdminCredentials, runId } from './support/admin-account';
 
 // Full product CRUD end to end on the REAL Java API (PCAR-6): the Playwright config of the kit
 // starts web, admin, api and Postgres, and the admin dev server proxies /api to the API. The test
-// signs in with the admin account of the API and goes through the UI only: RBAC (module and
+// signs in with the admin account of where it runs (support/admin-account.ts: the environment's
+// under /ao-qa, the bootstrap admin of apps/api/.env here) and goes through the UI only: RBAC (module and
 // permissions of GET /users/me), forms with the rules of the API, TanStack Query invalidation.
 // Its product carries a run id in its name and slug, so parallel runs never meet.
 
@@ -16,10 +17,14 @@ async function signIn(page: Page, admin: AdminCredentials): Promise<void> {
   await expect(page).toHaveURL(/\/$/); // LoginForm navigates home on success.
 }
 
-test('Product CRUD end-to-end on the API (create → read → update → delete)', async ({ page }) => {
-  const admin = adminCredentials();
-  test.skip(!admin, NO_ADMIN); // reason: the test signs in as the admin of the API, unknown on some environments
-  if (!admin) return;
+test('Product CRUD end-to-end on the API (create → read → update → delete)', async ({
+  page,
+  baseURL,
+}) => {
+  const account = adminAccount(baseURL);
+  test.skip(!account.ok, account.ok ? '' : account.reason); // reason: the test signs in as an admin of the API, unknown without its account
+  if (!account.ok) return;
+  const admin = account.credentials;
   const run = runId();
   const name = `E2E Gadget ${run}`;
 
